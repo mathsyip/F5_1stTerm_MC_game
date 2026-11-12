@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>中五數學第一學期訓練員</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #050510;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+        canvas { display: block; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .pointer-events-auto { pointer-events: auto; }
+        #joystick-zone { position: absolute; bottom: 30px; left: 30px; width: 140px; height: 140px; pointer-events: auto; display: none; z-index: 20; }
+        .joystick-base { width: 140px; height: 140px; background: rgba(0, 255, 255, 0.05); border: 2px solid rgba(0, 255, 255, 0.2); border-radius: 50%; position: absolute; top: 0; left: 0; }
+        .joystick-stick { width: 60px; height: 60px; background: rgba(0, 255, 255, 0.5); border-radius: 50%; position: absolute; top: 40px; left: 40px; box-shadow: 0 0 15px cyan; transition: transform 0.05s ease-out; }
+        .neon-btn { background: transparent; color: #0ff; border: 2px solid #0ff; box-shadow: 0 0 10px #0ff, inset 0 0 10px #0ff; transition: all 0.2s; text-transform: uppercase; letter-spacing: 2px; }
+        .neon-btn:hover { background: #0ff; color: #000; box-shadow: 0 0 20px #0ff, inset 0 0 20px #0ff; }
+        #exp-bar-container { width: 100%; height: 10px; background: #222; position: absolute; top: 0; left: 0; box-shadow: 0 0 10px rgba(0,255,255,0.2); z-index: 30; }
+        #exp-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #ff0055 0%, #ffaa00 50%, #00f2fe 100%); box-shadow: 0 0 15px #ffaa00; transition: width 0.1s linear; }
+        .fade-in { animation: fadeIn 0.3s forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .pulse-text { animation: pulseText 1.5s infinite alternate; }
+        @keyframes pulseText { from { text-shadow: 0 0 10px #f0f, 0 0 20px #f0f; } to { text-shadow: 0 0 20px #f0f, 0 0 40px #f0f; } }
+        .katex { font-size: 1.15em !important; }
+        .katex-display { margin: 0.2em 0 !important; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="joystick-zone">
+        <div class="joystick-base"></div>
+        <div class="joystick-stick" id="joystick-stick"></div>
+    </div>
+
+    <div id="ui-layer" class="flex flex-col justify-between pt-3 pb-4">
+        <div class="w-full relative">
+            <div id="exp-bar-container"><div id="exp-bar"></div></div>
+            <div class="flex justify-between items-start px-6 pt-5 text-white font-bold text-xl drop-shadow-md">
+                <div class="bg-black/50 px-3 py-1 rounded border border-cyan-500/50">
+                    <span class="text-cyan-400"><span id="lbl-level">系統評級</span> <span id="ui-level">1</span></span>
+                </div>
+                
+                <div class="flex flex-col items-center gap-2">
+                    <div class="text-3xl tracking-widest text-center" id="ui-timer" style="text-shadow: 0 0 10px white;">00:00</div>
+                    <div class="flex gap-3 bg-black/60 px-4 py-2 rounded-lg border border-gray-700/80 backdrop-blur-sm">
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-cyan-300">☄️ <span id="lbl-meteor">流星</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-meteor" class="h-full bg-cyan-400 w-0 transition-all duration-300 shadow-[0_0_5px_#00ffff]"></div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-fuchsia-400">⚡ <span id="lbl-lightning">閃電</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-lightning" class="h-full bg-fuchsia-500 w-0 transition-all duration-300 shadow-[0_0_5px_#f0f]"></div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-orange-400">🔥 <span id="lbl-firestorm">火燒</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-firestorm" class="h-full bg-orange-500 w-0 transition-all duration-300 shadow-[0_0_5px_#ff4500]"></div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-yellow-300">💥 <span id="lbl-shockwave">衝擊波</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-shockwave" class="h-full bg-yellow-400 w-0 transition-all duration-300 shadow-[0_0_5px_#ffee00]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-right bg-black/50 px-3 py-1 rounded border border-red-500/50">
+                    <span class="text-red-400"><span id="ui-hp">100</span> / <span id="ui-maxhp">100</span> HP</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute top-24 right-6 text-white text-lg font-mono bg-black/50 px-3 py-1 rounded border border-fuchsia-500/50" style="text-shadow: 0 0 5px #ff00ff;">
+            KILLS: <span id="ui-kills">0</span>
+        </div>
+    </div>
+
+    <div id="modal-container" class="absolute inset-0 bg-black/85 flex items-center justify-center pointer-events-auto z-50 flex-col backdrop-blur-md">
+        
+        <div id="start-screen" class="text-center p-8 bg-gray-900/90 border-2 border-cyan-500 rounded-xl shadow-[0_0_40px_rgba(0,255,255,0.4)] max-w-lg mx-4">
+            <h1 id="main-title-text" class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2 leading-tight" style="filter: drop-shadow(0 0 15px cyan);">中五數學第一學期訓練員</h1>
+            <p id="sub-title-text" class="text-cyan-200 mb-6 text-lg tracking-widest">S5 MATH TERM 1 TRAINER</p>
+            <div class="text-sm text-gray-300 mb-8 text-left bg-black/60 p-5 rounded-lg border border-gray-700 space-y-2">
+                <p>🕒 <strong>生存目標：</strong>生存 10 分鐘，解開知識封印。</p>
+                <p>🔫 <strong>武器系統：</strong>每升 2 級提升子彈傷害與發射頻率。</p>
+                <p>⚡ <strong>心智試煉：</strong>每 5 秒強制觸發，60 秒自由挑戰 3 張卡牌。</p>
+                <p class="text-yellow-400 font-bold border-l-4 border-yellow-400 pl-2 mt-2">💥 3/3 答對滿分可選擇補血或觸發 2 秒暴風衝擊波！</p>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4 w-full relative z-50 pointer-events-auto">
+                <button id="btn-start-zh" class="neon-btn px-6 py-4 text-lg font-bold rounded cursor-pointer flex-1 pointer-events-auto">繁體中文</button>
+                <button id="btn-start-en" class="neon-btn px-6 py-4 text-lg font-bold rounded cursor-pointer flex-1 pointer-events-auto !border-fuchsia-500 !text-fuchsia-400 hover:!bg-fuchsia-500 hover:!text-white shadow-[0_0_10px_#f0f,inset_0_0_10px_#f0f]">ENGLISH</button>
+            </div>
+        </div>
+
+        <div id="levelup-screen" class="hidden text-center p-4 md:p-6 bg-gray-900/95 border-2 border-fuchsia-500 rounded-xl shadow-[0_0_50px_rgba(255,0,255,0.4)] max-w-7xl w-[98%] relative">
+            <h2 id="lbl-quiz-title" class="text-3xl md:text-4xl font-black text-fuchsia-400 mb-1 tracking-widest pulse-text">心智試煉 LEVEL UP!</h2>
+            <p id="lbl-quiz-desc" class="text-gray-300 mb-4 text-sm md:text-base">60秒內選出正確概念步驟！三題全對可選擇特殊神技獎勵！</p>
+            
+            <div class="w-full bg-gray-800 h-3 rounded-full mb-4 overflow-hidden border border-gray-600 relative">
+                <div id="quiz-timer-bar" class="h-full bg-gradient-to-r from-fuchsia-600 to-pink-500 w-full transition-all duration-1000 ease-linear"></div>
+                <div id="quiz-timer-text" class="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow-md">60s</div>
+            </div>
+
+            <div id="quiz-cards-container" class="flex flex-col md:flex-row gap-4 w-full justify-center min-h-[350px]"></div>
+            
+            <div id="perfect-reward-overlay" class="hidden absolute inset-0 bg-black/90 rounded-xl flex flex-col items-center justify-center p-6 backdrop-blur-md z-30 fade-in">
+                <h3 class="text-3xl md:text-4xl font-black text-yellow-400 mb-2 drop-shadow-[0_0_15px_rgba(234,179,8,0.8)]">🎉 PERFECT! 3/3 全對獎勵 🎉</h3>
+                <p class="text-gray-200 mb-6 text-base md:text-lg" id="lbl-perfect-desc">請選擇你的試煉回報：</p>
+                <div class="flex flex-col sm:flex-row gap-6 w-full max-w-md">
+                    <button id="btn-reward-heal" class="flex-1 p-5 bg-gradient-to-br from-green-900/80 to-emerald-900/80 border-2 border-green-400 rounded-xl hover:scale-105 transition-transform flex flex-col items-center shadow-[0_0_20px_rgba(74,222,128,0.4)] cursor-pointer pointer-events-auto relative z-40">
+                        <span class="text-4xl mb-2 pointer-events-none">💖</span>
+                        <span class="text-xl font-bold text-green-300 pointer-events-none" id="lbl-heal-title">回復 20 生命值</span>
+                        <span class="text-xs text-green-200/80 mt-1 pointer-events-none" id="lbl-heal-sub">Restore +20 HP</span>
+                    </button>
+                    <button id="btn-reward-shockwave" class="flex-1 p-5 bg-gradient-to-br from-yellow-900/80 to-amber-900/80 border-2 border-yellow-400 rounded-xl hover:scale-105 transition-transform flex flex-col items-center shadow-[0_0_20px_rgba(250,204,21,0.4)] cursor-pointer pointer-events-auto relative z-40">
+                        <span class="text-4xl mb-2 pointer-events-none">💥</span>
+                        <span class="text-xl font-bold text-yellow-300 pointer-events-none" id="lbl-shockwave-title">2秒暴風衝擊波</span>
+                        <span class="text-xs text-yellow-200/80 mt-1 pointer-events-none" id="lbl-shockwave-sub">2s Continuous Wave</span>
+                    </button>
+                </div>
+            </div>
+
+            <button id="btn-continue" class="hidden neon-btn mt-4 px-10 py-3 text-lg rounded mx-auto pointer-events-auto w-full md:w-auto border-fuchsia-500 text-fuchsia-400 hover:bg-fuchsia-500 hover:text-white shadow-[0_0_10px_#f0f,inset_0_0_10px_#f0f] relative z-50">繼續戰鬥</button>
+        </div>
+
+        <div id="gameover-screen" class="hidden text-center p-8 bg-gray-900/95 border-2 border-red-500 rounded-xl shadow-[0_0_40px_rgba(255,0,0,0.5)] max-w-lg mx-4 w-full">
+            <h1 class="text-5xl font-black text-red-500 mb-4 drop-shadow-md" id="end-title">SYSTEM FAILURE</h1>
+            <p class="text-xl text-gray-300 mb-4" id="end-desc">你被實體洪流吞噬了...</p>
+            <div class="text-left text-gray-300 mb-8 space-y-3 text-lg bg-black/50 p-6 rounded-lg border border-gray-700">
+                <div class="flex justify-between border-b border-gray-700 pb-2"><span id="lbl-end-time">存活時間</span> <span id="end-time" class="text-white font-mono">00:00</span></div>
+                <div class="flex justify-between border-b border-gray-700 pb-2"><span id="lbl-end-kills">消滅實體</span> <span id="end-kills" class="text-white font-mono text-fuchsia-400">0</span></div>
+                <div class="flex justify-between"><span id="lbl-end-level">系統評級</span> <span id="end-level" class="text-white font-mono text-cyan-400">1</span></div>
+            </div>
+            <button id="btn-restart" class="neon-btn px-8 py-4 text-xl font-bold rounded cursor-pointer w-full pointer-events-auto relative z-50 !border-red-500 !text-red-500 hover:!bg-red-500 hover:!text-black !shadow-[0_0_10px_#f00,inset_0_0_10px_#f00]">REBOOT SYSTEM</button>
+        </div>
+    </div>
+
+<script>
+// ============================================================================
+// 💡 區塊 1：課題設定模組 (S5 TOPIC CONFIGURATION) 
+// ============================================================================
+const MathHelper = {
+    randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+    gcd: (a, b) => b === 0 ? Math.abs(a) : MathHelper.gcd(b, a % b),
+    fact: (n) => n <= 1 ? 1 : n * MathHelper.fact(n - 1),
+    nCr: (n, r) => MathHelper.fact(n) / (MathHelper.fact(r) * MathHelper.fact(n - r)),
+    nPr: (n, r) => MathHelper.fact(n) / MathHelper.fact(n - r)
+};
+
+const TopicConfig = {
+    titleZh: '中五數學第一學期訓練員',
+    titleEn: 'S5 MATH TERM 1 TRAINER',
+    
+    state: {
+        0: { stage: 0, sharedVars: {} }, // 不等式 Inequalities
+        1: { stage: 0, sharedVars: {} }, // 變分 Variations
+        2: { stage: 0, sharedVars: {} }, // 組合與排列 P&C
+        3: { stage: 0, sharedVars: {} }, // 聯立/Delta方程 Sim. Eq/Delta
+        4: { stage: 0, sharedVars: {} }  // 轉換方程 Transformable Eq
+    },
+
+    generateSVG: function(type, vars, isEn) {
+        if (type === 'number_line') { // Lollipops for inequalities
+            let c1 = vars.type1 === 'open' ? 'fill="none" stroke="#00ffff" stroke-width="2"' : 'fill="#00ffff"';
+            let c2 = vars.type2 === 'open' ? 'fill="none" stroke="#e085ff" stroke-width="2"' : 'fill="#e085ff"';
+            
+            // Draw shading only if requested
+            let shading = '';
+            if (vars.showShading) {
+                if (vars.dir1 === 'right' && vars.dir2 === 'left' && vars.val1 < vars.val2) {
+                    shading = `<rect x="60" y="25" width="80" height="20" fill="url(#grad_shade)" opacity="0.5" />`;
+                }
+            }
+
+            return `<svg width="200" height="80" viewBox="0 0 200 80" class="mx-auto" style="width: 100%; max-width: 250px; height: auto;">
+                <defs>
+                    <linearGradient id="grad_shade" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#00ffff" />
+                        <stop offset="100%" stop-color="#e085ff" />
+                    </linearGradient>
+                </defs>
+                ${shading}
+                <line x1="20" y1="50" x2="180" y2="50" stroke="#fff" stroke-width="2" />
+                <path d="M 180 50 L 170 45 L 170 55 Z" fill="#fff" />
+                <path d="M 20 50 L 30 45 L 30 55 Z" fill="#fff" />
+                
+                <line x1="60" y1="45" x2="60" y2="55" stroke="#fff" stroke-width="2" />
+                <text x="60" y="70" fill="#fff" font-size="12" text-anchor="middle">${vars.val1}</text>
+                
+                <line x1="140" y1="45" x2="140" y2="55" stroke="#fff" stroke-width="2" />
+                <text x="140" y="70" fill="#fff" font-size="12" text-anchor="middle">${vars.val2}</text>
+
+                <!-- Lollipop 1 -->
+                <line x1="60" y1="45" x2="60" y2="25" stroke="#00ffff" stroke-width="2" />
+                <line x1="60" y1="25" x2="${vars.dir1 === 'right' ? '120' : '30'}" y2="25" stroke="#00ffff" stroke-width="2" />
+                <path d="M ${vars.dir1 === 'right' ? '120 25 L 110 20 L 110 30' : '30 25 L 40 20 L 40 30'} Z" fill="#00ffff" />
+                <circle cx="60" cy="25" r="4" ${c1} />
+
+                <!-- Lollipop 2 -->
+                <line x1="140" y1="45" x2="140" y2="35" stroke="#e085ff" stroke-width="2" />
+                <line x1="140" y1="35" x2="${vars.dir2 === 'right' ? '180' : '80'}" y2="35" stroke="#e085ff" stroke-width="2" />
+                <path d="M ${vars.dir2 === 'right' ? '180 35 L 170 30 L 170 40' : '80 35 L 90 30 L 90 40'} Z" fill="#e085ff" />
+                <circle cx="140" cy="35" r="4" ${c2} />
+            </svg>`;
+        } else if (type === 'parabola') {
+            return `<svg width="200" height="120" viewBox="0 0 200 120" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <line x1="20" y1="80" x2="180" y2="80" stroke="#fff" stroke-width="2" />
+                <path d="M 180 80 L 170 75 L 170 85 Z" fill="#fff" />
+                <path d="M 40 20 Q 100 160 160 20" fill="none" stroke="#ffea00" stroke-width="2" />
+                <circle cx="65" cy="80" r="3" fill="#ff4500" />
+                <text x="65" y="100" fill="#ff4500" font-size="12" text-anchor="middle">${vars.root1}</text>
+                <circle cx="135" cy="80" r="3" fill="#ff4500" />
+                <text x="135" y="100" fill="#ff4500" font-size="12" text-anchor="middle">${vars.root2}</text>
+                <text x="100" y="30" fill="#ffea00" font-size="12" text-anchor="middle">y = f(x)</text>
+            </svg>`;
+        } else if (type === 'trig_graph') {
+            const func = vars.func || 'sin'; // 'sin' or 'cos'
+            const lines = vars.lines || []; // array of { val: number, label: string, color: string }
+            
+            const xStart = 35, xEnd = 215, width = 180; // 0 to 360 deg
+            const yMid = 65, amp = 38; // y=1 -> 27, y=-1 -> 103
+            
+            // Generate smooth curve points
+            let pathD = '';
+            for (let deg = 0; deg <= 360; deg += 5) {
+                let rad = deg * Math.PI / 180;
+                let val = func === 'sin' ? Math.sin(rad) : Math.cos(rad);
+                let px = xStart + (deg / 360) * width;
+                let py = yMid - val * amp;
+                pathD += (deg === 0 ? `M ${px.toFixed(1)} ${py.toFixed(1)}` : ` L ${px.toFixed(1)} ${py.toFixed(1)}`);
+            }
+
+            // Generate horizontal lines & intersection dots (0 <= theta < 360)
+            let linesSVG = '';
+            let dotsSVG = '';
+            lines.forEach(line => {
+                if (line.val >= -1 && line.val <= 1) {
+                    let ly = yMid - line.val * amp;
+                    linesSVG += `<line x1="${xStart}" y1="${ly.toFixed(1)}" x2="${xEnd + 5}" y2="${ly.toFixed(1)}" stroke="${line.color}" stroke-width="1.5" stroke-dasharray="4,2" />`;
+                    linesSVG += `<text x="${xEnd + 8}" y="${(ly + 3).toFixed(1)}" fill="${line.color}" font-size="9" font-weight="bold">${line.label}</text>`;
+
+                    // Find intersections in [0, 360)
+                    let degs = [];
+                    if (func === 'sin') {
+                        if (Math.abs(line.val - 1) < 1e-5) degs = [90];
+                        else if (Math.abs(line.val + 1) < 1e-5) degs = [270];
+                        else if (Math.abs(line.val) < 1e-5) degs = [0, 180]; // 360 excluded
+                        else if (line.val > 0) {
+                            let a = Math.asin(line.val) * 180 / Math.PI;
+                            degs = [a, 180 - a];
+                        } else {
+                            let a = Math.asin(Math.abs(line.val)) * 180 / Math.PI;
+                            degs = [180 + a, 360 - a];
+                        }
+                    } else { // cos
+                        if (Math.abs(line.val - 1) < 1e-5) degs = [0]; // 360 excluded
+                        else if (Math.abs(line.val + 1) < 1e-5) degs = [180];
+                        else if (Math.abs(line.val) < 1e-5) degs = [90, 270];
+                        else {
+                            let a = Math.acos(line.val) * 180 / Math.PI;
+                            degs = [a, 360 - a];
+                        }
+                    }
+
+                    degs.forEach(d => {
+                        let dx = xStart + (d / 360) * width;
+                        dotsSVG += `<circle cx="${dx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5" fill="${line.color}" stroke="#000" stroke-width="1" />`;
+                    });
+                }
+            });
+
+            // Open circle at 360 deg to remind 0 <= theta < 360
+            let endVal = func === 'sin' ? 0 : 1;
+            let endY = yMid - endVal * amp;
+
+            return `<svg width="260" height="130" viewBox="0 0 260 130" class="mx-auto" style="width: 100%; max-width: 260px; height: auto;">
+                <!-- Axes -->
+                <line x1="${xStart}" y1="15" x2="${xStart}" y2="115" stroke="#888" stroke-width="1.5" />
+                <line x1="${xStart - 5}" y1="${yMid}" x2="${xEnd + 8}" y2="${yMid}" stroke="#888" stroke-width="1.5" />
+                
+                <!-- Y-axis labels -->
+                <text x="${xStart - 5}" y="${yMid - amp + 3}" fill="#aaa" font-size="9" text-anchor="end">1</text>
+                <text x="${xStart - 5}" y="${yMid + 3}" fill="#aaa" font-size="9" text-anchor="end">0</text>
+                <text x="${xStart - 5}" y="${yMid + amp + 3}" fill="#aaa" font-size="9" text-anchor="end">-1</text>
+
+                <!-- X-axis ticks & labels -->
+                <line x1="${xStart + width*0.25}" y1="${yMid - 2}" x2="${xStart + width*0.25}" y2="${yMid + 2}" stroke="#888" stroke-width="1" />
+                <text x="${xStart + width*0.25}" y="${yMid + 11}" fill="#aaa" font-size="8" text-anchor="middle">90°</text>
+                
+                <line x1="${xStart + width*0.5}" y1="${yMid - 2}" x2="${xStart + width*0.5}" y2="${yMid + 2}" stroke="#888" stroke-width="1" />
+                <text x="${xStart + width*0.5}" y="${yMid + 11}" fill="#aaa" font-size="8" text-anchor="middle">180°</text>
+                
+                <line x1="${xStart + width*0.75}" y1="${yMid - 2}" x2="${xStart + width*0.75}" y2="${yMid + 2}" stroke="#888" stroke-width="1" />
+                <text x="${xStart + width*0.75}" y="${yMid + 11}" fill="#aaa" font-size="8" text-anchor="middle">270°</text>
+                
+                <line x1="${xEnd}" y1="${yMid - 2}" x2="${xEnd}" y2="${yMid + 2}" stroke="#888" stroke-width="1" />
+                <text x="${xEnd}" y="${yMid + 11}" fill="#aaa" font-size="8" text-anchor="middle">360°</text>
+
+                <!-- Function Label -->
+                <text x="${xStart + 8}" y="20" fill="#00ffff" font-size="10" font-weight="bold">y = ${func} θ</text>
+
+                <!-- Trig Curve -->
+                <path d="${pathD}" fill="none" stroke="#00ffff" stroke-width="2" />
+                <!-- Open circle at 360 deg -->
+                <circle cx="${xEnd}" cy="${endY}" r="3" fill="#111827" stroke="#00ffff" stroke-width="1.5" />
+
+                <!-- Horizontal lines & Intersections -->
+                ${linesSVG}
+                ${dotsSVG}
+            </svg>`;
+        }
+        return null;
+    },
+
+    generateQuestion: function(lang) {
+        const isEn = lang === 'en';
+        let type = MathHelper.randInt(0, 4);
+        let question = "", correct = "", wrongs = [], svg = null, prevSteps = [];
+        let state = this.state[type];
+
+        if (type === 0) { // 1. 不等式 Inequalities
+            let subType = state.subType !== undefined ? state.subType : MathHelper.randInt(0, 2);
+            state.subType = subType;
+
+            if (subType === 0) { // Linear Compound
+                if (state.stage === 0) {
+                    let v1 = MathHelper.randInt(-3, 3), v2 = v1 + MathHelper.randInt(3, 7);
+                    state.sharedVars = { v1, v2 };
+                    question = `x > ${v1} \\text{ ${isEn?'and':'及'} } x \\le ${v2}`;
+                    correct = `${v1} < x \\le ${v2}`;
+                    wrongs = [`x > ${v1}`, `x \\le ${v2}`, `\\text{${isEn?'No solution':'無解'}}`];
+                    svg = this.generateSVG('number_line', { val1: v1, val2: v2, type1: 'open', type2: 'solid', dir1: 'right', dir2: 'left', showShading: false }, isEn);
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else {
+                    let { v1, v2, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = `${v1} < x \\le ${v2}`;
+                    let count = v2 - Math.floor(v1); 
+                    correct = `\\text{${isEn? count + ' integers' : count + ' 個整數'}}`;
+                    wrongs = [`\\text{${isEn? (count-1) + ' integers' : (count-1) + ' 個整數'}}`, `\\text{${isEn? (count+1) + ' integers' : (count+1) + ' 個整數'}}`, `\\text{${isEn? 'Max int is ' + (v2-1) : '最大整數為 ' + (v2-1)}}`];
+                    svg = this.generateSVG('number_line', { val1: v1, val2: v2, type1: 'open', type2: 'solid', dir1: 'right', dir2: 'left', showShading: true }, isEn);
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 1) { // Quadratic
+                if (state.stage === 0) {
+                    let r1 = MathHelper.randInt(-4, 0), r2 = MathHelper.randInt(1, 5);
+                    let a = -MathHelper.randInt(1, 3);
+                    let b = -a * (r1 + r2), c = a * r1 * r2;
+                    let sign = Math.random() < 0.5 ? '>' : '\\le';
+                    state.sharedVars = { r1, r2, a, b, c, sign };
+                    let eqStr = `${a === -1 ? '-' : a}x^2 ${b >= 0 ? '+' : ''}${b}x ${c >= 0 ? '+' : ''}${c} ${sign} 0`;
+                    question = eqStr;
+                    let newSign = sign === '>' ? '<' : '\\ge';
+                    correct = `${-a === 1 ? '' : -a}x^2 ${-b >= 0 ? '+' : ''}${-b}x ${-c >= 0 ? '+' : ''}${-c} ${newSign} 0`;
+                    wrongs = [
+                        `${-a}x^2 ${-b >= 0 ? '+' : ''}${-b}x ${-c >= 0 ? '+' : ''}${-c} ${sign} 0`,
+                        `${-a}x^2 ${b >= 0 ? '+' : ''}${b}x ${c >= 0 ? '+' : ''}${c} ${newSign} 0`,
+                        `${a}x^2 ${b >= 0 ? '+' : ''}${b}x ${c >= 0 ? '+' : ''}${c} ${newSign} 0`
+                    ];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { r1, r2, a, b, c, sign, h1 } = state.sharedVars;
+                    let newSign = sign === '>' ? '<' : '\\ge';
+                    prevSteps = [h1];
+                    question = `${-a === 1 ? '' : -a}x^2 ${-b >= 0 ? '+' : ''}${-b}x ${-c >= 0 ? '+' : ''}${-c} ${newSign} 0`;
+                    correct = `${-a === 1 ? '' : -a}(x - ${r1})(x - ${r2}) ${newSign} 0`.replace(/-\s-/g, '+ ');
+                    wrongs = [
+                        `${-a === 1 ? '' : -a}(x + ${r1})(x + ${r2}) ${newSign} 0`.replace(/\+\s-/g, '- '),
+                        `(x - ${r1})(x - ${r2}) ${sign} 0`.replace(/-\s-/g, '+ '),
+                        `${-a === 1 ? '' : -a}(x - ${r1})(x + ${r2}) ${newSign} 0`.replace(/-\s-/g, '+ ')
+                    ];
+                    state.sharedVars.h2 = question;
+                    state.stage = 2;
+                } else {
+                    let { r1, r2, sign, h1, h2 } = state.sharedVars;
+                    let newSign = sign === '>' ? '<' : '\\ge';
+                    prevSteps = [h1, h2];
+                    question = `(x - ${r1})(x - ${r2}) ${newSign} 0`.replace(/-\s-/g, '+ ');
+                    
+                    if (newSign === '<') {
+                        correct = `${r1} < x < ${r2}`;
+                        wrongs = [`x < ${r1} \\text{ ${isEn?'or':'或'} } x > ${r2}`, `${r1} \\le x \\le ${r2}`, `x \\le ${r1} \\text{ ${isEn?'or':'或'} } x \\ge ${r2}`];
+                    } else {
+                        correct = `x \\le ${r1} \\text{ ${isEn?'or':'或'} } x \\ge ${r2}`;
+                        wrongs = [`${r1} \\le x \\le ${r2}`, `x < ${r1} \\text{ ${isEn?'or':'或'} } x > ${r2}`, `${r1} < x < ${r2}`];
+                    }
+                    svg = this.generateSVG('parabola', { root1: r1, root2: r2 }, isEn);
+                    state.stage = 0; delete state.subType;
+                }
+            } else { // OR Compound
+                if (state.stage === 0) {
+                    let v1 = MathHelper.randInt(-5, -1), v2 = MathHelper.randInt(1, 5);
+                    state.sharedVars = { v1, v2 };
+                    question = `x < ${v1} \\text{ ${isEn?'or':'或'} } x > ${v2}`;
+                    correct = `x < ${v1} \\text{ ${isEn?'or':'或'} } x > ${v2}`;
+                    wrongs = [`${v1} < x < ${v2}`, `\\text{${isEn?'All real numbers':'所有實數'}}`, `\\text{${isEn?'No solution':'無解'}}`];
+                    svg = this.generateSVG('number_line', { val1: v1, val2: v2, type1: 'open', type2: 'open', dir1: 'left', dir2: 'right', showShading: false }, isEn);
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else {
+                    let { v1, v2, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = `x < ${v1} \\text{ ${isEn?'or':'或'} } x > ${v2}`;
+                    let notSatisfying = (v2 - v1) + 1;
+                    correct = `\\text{${isEn ? notSatisfying + ' ints NOT satisfying' : '不滿足的整數有 ' + notSatisfying + ' 個'}}`;
+                    wrongs = [
+                        `\\text{${isEn ? (notSatisfying+1) + ' ints NOT satisfying' : '不滿足的整數有 ' + (notSatisfying+1) + ' 個'}}`,
+                        `\\text{${isEn ? (notSatisfying-1) + ' ints NOT satisfying' : '不滿足的整數有 ' + (notSatisfying-1) + ' 個'}}`,
+                        `\\text{${isEn ? 'Infinite ints' : '無限多個整數'}}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            }
+
+        } else if (type === 1) { // 2. 變分 Variations
+            let subType = state.subType !== undefined ? state.subType : MathHelper.randInt(0, 3);
+            state.subType = subType;
+
+            let terms = [
+                { en: "x", zh: "x", math: "x", eval: (v)=>v, niceVals: [2, 3, 4, 5, 6] },
+                { en: "x^2", zh: "x \\text{ 的平方}", math: "x^2", eval: (v)=>v*v, niceVals: [2, 3, 4, 5] },
+                { en: "\\sqrt{x}", zh: "x \\text{ 的平方根}", math: "\\sqrt{x}", eval: (v)=>Math.sqrt(v), niceVals: [4, 9, 16, 25] },
+                { en: "x^3", zh: "x \\text{ 的立方}", math: "x^3", eval: (v)=>v*v*v, niceVals: [2, 3, 4] },
+                { en: "\\sqrt[3]{x}", zh: "x \\text{ 的立方根}", math: "\\sqrt[3]{x}", eval: (v)=>Math.round(Math.cbrt(v)), niceVals: [8, 27, 64] }
+            ];
+
+            if (state.stage === 0) {
+                if (subType === 0) { // 部分變 Partial Variation
+                    let idx1 = MathHelper.randInt(0, 4);
+                    let idx2 = MathHelper.randInt(0, 4);
+                    while(idx1 === idx2) idx2 = MathHelper.randInt(0, 4);
+                    let t1 = terms[idx1];
+                    let t2 = terms[idx2];
+                    state.sharedVars = { t1, t2 };
+                    question = isEn 
+                        ? `\\text{y is sum of 2 parts.} \\\\ \\text{One varies directly as } ${t1.math}\\text{,} \\\\ \\text{the other directly as } ${t2.math}\\text{. Eq?}` 
+                        : `\\text{y為兩部分之和，} \\\\ \\text{一部分隨 } ${t1.zh} \\text{ 正變，} \\\\ \\text{另一部分隨 } ${t2.zh} \\text{ 正變。} \\\\ \\text{相關方程？}`;
+                    correct = `y = k_1 ${t1.math} + k_2 ${t2.math}`;
+                    wrongs = [
+                        `y = k_1 ${t1.math} + \\frac{k_2}{${t2.math}}`,
+                        `y = k ${t1.math} ${t2.math}`,
+                        `y = k_1 + k_2 ${t1.math} ${t2.math}`
+                    ];
+                    state.sharedVars.h1 = question.split('\\\\')[0] + '\\\\' + question.split('\\\\')[1];
+                    state.stage = 1;
+                } else if (subType === 1) { // 聯變 Joint Variation
+                    let t1 = terms[MathHelper.randInt(1, 3)];
+                    let t2 = { en: "z", zh: "z", math: "z" };
+                    state.sharedVars = { t1 };
+                    question = isEn 
+                        ? `y \\text{ varies directly as } ${t1.math} \\\\ \\text{and inversely as } z\\text{. Eq?}` 
+                        : `y \\text{ 隨 } ${t1.zh} \\text{ 正變，} \\\\ \\text{且隨 } z \\text{ 反變。相關方程？}`;
+                    correct = `y = \\frac{k ${t1.math}}{z}`;
+                    wrongs = [
+                        `y = k ${t1.math} z`,
+                        `y = \\frac{k z}{${t1.math}}`,
+                        `${t1.math} = \\frac{k y}{z}`
+                    ];
+                    state.sharedVars.h1 = question.split('\\\\')[0];
+                    state.stage = 1;
+                } else if (subType === 2 || subType === 3) { // 正變 Direct / 反變 Inverse (4-stage flow)
+                    let t1 = terms[MathHelper.randInt(1, 4)];
+                    let idx1 = MathHelper.randInt(0, t1.niceVals.length - 2);
+                    let v1 = t1.niceVals[idx1];
+                    let v2 = t1.niceVals[idx1 + 1];
+                    let val1 = t1.eval(v1);
+                    let val2 = t1.eval(v2);
+
+                    if (subType === 2) { // Direct
+                        let k = MathHelper.randInt(2, 5);
+                        let y1 = k * val1;
+                        let y2 = k * val2;
+                        state.sharedVars = { t1, v1, v2, k, y1, y2 };
+                        question = isEn ? `y \\text{ varies directly as } ${t1.math}. \\\\ \\text{Eq?}` : `y \\text{ 隨 } ${t1.zh} \\text{ 正變。} \\\\ \\text{相關方程？}`;
+                        correct = `y = k${t1.math}`;
+                        wrongs = [`y = \\frac{k}{${t1.math}}`, `y = k_1 + k_2${t1.math}`, `${t1.math} = ky`];
+                    } else { // Inverse
+                        let lcm = (val1 * val2) / MathHelper.gcd(val1, val2);
+                        let k = lcm * MathHelper.randInt(1, 3);
+                        let y1 = k / val1;
+                        let y2 = k / val2;
+                        state.sharedVars = { t1, v1, v2, k, y1, y2 };
+                        question = isEn ? `y \\text{ varies inversely as } ${t1.math}. \\\\ \\text{Eq?}` : `y \\text{ 隨 } ${t1.zh} \\text{ 反變。} \\\\ \\text{相關方程？}`;
+                        correct = `y = \\frac{k}{${t1.math}}`;
+                        wrongs = [`y = k${t1.math}`, `y = k_1 + \\frac{k_2}{${t1.math}}`, `y = k - ${t1.math}`];
+                    }
+                    state.sharedVars.h1 = question.split('\\\\')[0];
+                    state.stage = 1;
+                }
+            } else if (state.stage === 1) { 
+                if (subType === 0) { // Partial -> f(x) inequality
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    let r1 = -2, r2 = 3;
+                    question = isEn 
+                        ? `\\text{Let } y = f(x) = x^2 - x - 6\\text{.} \\\\ \\text{Find } x \\text{ for } f(x) < 0.` 
+                        : `\\text{設 } y = f(x) = x^2 - x - 6\\text{。} \\\\ \\text{求 } f(x) < 0 \\text{ 的範圍。}`;
+                    correct = `-2 < x < 3`;
+                    wrongs = [`x < -2 \\text{ ${isEn?'or':'或'} } x > 3`, `-3 < x < 2`, `x < -3 \\text{ ${isEn?'or':'或'} } x > 2`];
+                    svg = this.generateSVG('parabola', { root1: r1, root2: r2 }, isEn);
+                    state.stage = 0; delete state.subType;
+                } else if (subType === 1) { // Joint -> Percentage change
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn 
+                        ? `\\text{If } y \\propto \\frac{x^2}{z}\\text{.} \\\\ x \\text{ increases by 10\\%,} \\\\ z \\text{ decreases by 20\\%.} \\\\ \\text{\\% change of } y\\text{?}` 
+                        : `\\text{若 } y \\propto \\frac{x^2}{z}\\text{。} \\\\ x \\text{ 增加 10\\%，} z \\text{ 減少 20\\%。} \\\\ y \\text{ 的百分變化？}`;
+                    correct = `+51.25\\%`;
+                    wrongs = [`+50\\%`, `+37.5\\%`, `-51.25\\%`];
+                    state.stage = 0; delete state.subType;
+                } else { // Direct / Inverse - Find K
+                    let { t1, v1, y1, k, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    if (subType === 2) {
+                        question = isEn ? `\\text{Let } y = k${t1.math}. \\\\ \\text{Sub } x = ${v1}, y = ${y1}. \\\\ \\text{Find eq.}` : `\\text{設 } y = k${t1.math}。 \\\\ \\text{代入 } x = ${v1}, y = ${y1}。 \\\\ \\text{求方程。}`;
+                        correct = `y = ${k}${t1.math}`;
+                        wrongs = [`y = ${k+1}${t1.math}`, `y = ${Math.floor(k/2)||1}${t1.math}`, `y = \\frac{${k}}{${t1.math}}`];
+                    } else if (subType === 3) {
+                        question = isEn ? `\\text{Let } y = \\frac{k}{${t1.math}}. \\\\ \\text{Sub } x = ${v1}, y = ${y1}. \\\\ \\text{Find eq.}` : `\\text{設 } y = \\frac{k}{${t1.math}}。 \\\\ \\text{代入 } x = ${v1}, y = ${y1}。 \\\\ \\text{求方程。}`;
+                        correct = `y = \\frac{${k}}{${t1.math}}`;
+                        wrongs = [`y = \\frac{${k+2}}{${t1.math}}`, `y = \\frac{${Math.floor(k/2)||1}}{${t1.math}}`, `y = ${k}${t1.math}`];
+                    }
+                    state.sharedVars.h2 = correct;
+                    state.stage = 2;
+                }
+            } else if (state.stage === 2) { // Direct / Inverse - Find New Value
+                let { t1, v2, y2, k, h1, h2 } = state.sharedVars;
+                prevSteps = [h1, h2];
+                if (subType === 2) {
+                    question = isEn ? `\\text{Eq: } y = ${k}${t1.math}. \\\\ \\text{Find } y \\text{ when } x = ${v2}.` : `\\text{方程: } y = ${k}${t1.math}。 \\\\ \\text{求當 } x = ${v2} \\text{ 時的 } y \\text{。}`;
+                    correct = `y = ${y2}`;
+                    wrongs = [`y = ${y2+k}`, `y = ${y2-k}`, `y = ${y2*2}`];
+                } else if (subType === 3) {
+                    question = isEn ? `\\text{Eq: } y = \\frac{${k}}{${t1.math}}. \\\\ \\text{Find } y \\text{ when } x = ${v2}.` : `\\text{方程: } y = \\frac{${k}}{${t1.math}}。 \\\\ \\text{求當 } x = ${v2} \\text{ 時的 } y \\text{。}`;
+                    correct = `y = ${y2}`;
+                    wrongs = [`y = ${y2+2}`, `y = ${y2-1}`, `y = ${y2*2}`];
+                }
+                state.sharedVars.h3 = correct;
+                state.stage = 3;
+            } else if (state.stage === 3) { // Direct / Inverse - Find Change
+                let { v1, v2, y1, y2, h2, h3 } = state.sharedVars;
+                prevSteps = [h2, h3];
+                let diff = y2 - y1;
+                let diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+                question = isEn ? `x \\text{ goes } ${v1} \\to ${v2}. \\\\ \\text{Old } y = ${y1}, \\text{ new } y = ${y2}. \\\\ \\text{Change in } y?` : `x \\text{ 由 } ${v1} \\text{ 變為 } ${v2}。 \\\\ \\text{舊 } y = ${y1}\\text{, 新 } y = ${y2}。 \\\\ y \\text{ 的改變為？}`;
+                correct = `${y2} - ${y1} = ${diffStr}`;
+                wrongs = [
+                    `${y1} - ${y2} = ${-diff > 0 ? '+' : ''}${-diff}`, 
+                    `${y2} + ${y1} = +${y2 + y1}`, 
+                    `${diffStr}`
+                ];
+                state.stage = 0; delete state.subType;
+            }
+
+        } else if (type === 2) { // 3. 排序與組合 P&C
+            let subType = state.subType !== undefined ? state.subType : MathHelper.randInt(0, 3);
+            state.subType = subType;
+
+            if (subType === 0) { // Queueing (Together vs Separate sides)
+                if (state.stage === 0) {
+                    let b = MathHelper.randInt(3, 5), g = MathHelper.randInt(2, 4);
+                    state.sharedVars = { b, g };
+                    question = isEn 
+                        ? `\\text{${b} boys \\& ${g} girls queue.} \\\\ \\text{Girls must be together.}` 
+                        : `\\text{${b} 男 ${g} 女排隊。} \\\\ \\text{女仔必須相鄰。}`;
+                    let ans = MathHelper.fact(b + 1) * MathHelper.fact(g);
+                    correct = `${b + 1}! \\times ${g}! = ${ans}`;
+                    wrongs = [
+                        `${b + g}! = ${MathHelper.fact(b+g)}`,
+                        `${b}! \\times ${g}! = ${MathHelper.fact(b)*MathHelper.fact(g)}`,
+                        `${b + 1}! = ${MathHelper.fact(b+1)}`
+                    ];
+                    state.sharedVars.h1 = question.split('\\\\')[0];
+                    state.stage = 1;
+                } else {
+                    let { b, g, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn 
+                        ? `\\text{Boys on left, girls on right.}` 
+                        : `\\text{男左女右。}`;
+                    let ans = MathHelper.fact(b) * MathHelper.fact(g);
+                    correct = `${b}! \\times ${g}! = ${ans}`;
+                    wrongs = [
+                        `${b+g}! = ${MathHelper.fact(b+g)}`,
+                        `${b+1}! \\times ${g}! = ${MathHelper.fact(b+1)*MathHelper.fact(g)}`,
+                        `{}^{${b+g}}C_{${b}} = ${MathHelper.nCr(b+g, b)}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 1) { // Committee (Specific composition & At most)
+                if (state.stage === 0) {
+                    question = isEn 
+                        ? `\\text{5 boys \\& 4 girls form 3-person committee.} \\\\ \\text{1 boy \\& 2 girls.}` 
+                        : `\\text{5男4女組成3人委員會。} \\\\ \\text{1男2女。}`;
+                    let ans = MathHelper.nCr(5, 1) * MathHelper.nCr(4, 2);
+                    correct = `{}^5C_1 \\times {}^4C_2 = ${ans}`;
+                    wrongs = [
+                        `{}^5C_1 + {}^4C_2 = ${MathHelper.nCr(5,1) + MathHelper.nCr(4,2)}`,
+                        `{}^9C_3 = ${MathHelper.nCr(9,3)}`,
+                        `{}^5C_1 \\times {}^4C_3 = ${MathHelper.nCr(5,1) * MathHelper.nCr(4,3)}`
+                    ];
+                    state.sharedVars.h1 = question.split('\\\\')[0];
+                    state.stage = 1;
+                } else {
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn 
+                        ? `\\text{At most 2 girls.}` 
+                        : `\\text{最多2個女仔。}`;
+                    let ans = MathHelper.nCr(9,3) - MathHelper.nCr(4,3);
+                    correct = `{}^9C_3 - {}^4C_3 = ${ans}`;
+                    wrongs = [
+                        `{}^5C_1 \\times {}^4C_2 = ${MathHelper.nCr(5,1) * MathHelper.nCr(4,2)}`,
+                        `{}^9C_3 = ${MathHelper.nCr(9,3)}`,
+                        `{}^9C_3 - {}^5C_3 = ${MathHelper.nCr(9,3) - MathHelper.nCr(5,3)}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 2) { // Committee (At least & Specific Inclusion)
+                if (state.stage === 0) {
+                    question = isEn 
+                        ? `\\text{6 boys \\& 4 girls form 4-person committee.} \\\\ \\text{At least 1 girl.}` 
+                        : `\\text{6男4女組成4人委員會。} \\\\ \\text{最少1個女仔。}`;
+                    let ans = MathHelper.nCr(10, 4) - MathHelper.nCr(6, 4);
+                    correct = `{}^{10}C_4 - {}^6C_4 = ${ans}`;
+                    wrongs = [
+                        `{}^4C_1 \\times {}^9C_3 = ${MathHelper.nCr(4,1) * MathHelper.nCr(9,3)}`,
+                        `{}^{10}C_4 - {}^4C_4 = ${MathHelper.nCr(10,4) - MathHelper.nCr(4,4)}`,
+                        `{}^{10}C_4 = ${MathHelper.nCr(10,4)}`
+                    ];
+                    state.sharedVars.h1 = question.split('\\\\')[0];
+                    state.stage = 1;
+                } else {
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn 
+                        ? `\\text{Peter \\& Mary must be included.}` 
+                        : `\\text{Peter 和 Mary 必須包括在內。}`;
+                    let ans = MathHelper.nCr(8, 2);
+                    correct = `{}^8C_2 = ${ans}`;
+                    wrongs = [
+                        `{}^{10}C_2 = ${MathHelper.nCr(10,2)}`,
+                        `{}^8C_4 = ${MathHelper.nCr(8,4)}`,
+                        `{}^6C_1 \\times {}^4C_1 = ${MathHelper.nCr(6,1) * MathHelper.nCr(4,1)}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            } else { // Queueing (Leftmost & Not Adjacent using nCr)
+                if (state.stage === 0) {
+                    question = isEn 
+                        ? `\\text{4 boys \\& 3 girls queue.} \\\\ \\text{Peter must be at the leftmost.}` 
+                        : `\\text{4男3女排隊。} \\\\ \\text{Peter必須在最左邊。}`;
+                    let ans = MathHelper.fact(6);
+                    correct = `1 \\times 6! = ${ans}`;
+                    wrongs = [
+                        `7! = ${MathHelper.fact(7)}`,
+                        `2 \\times 6! = ${2 * MathHelper.fact(6)}`,
+                        `6! \\times 2! = ${MathHelper.fact(6) * 2}`
+                    ];
+                    state.sharedVars.h1 = question.split('\\\\')[0];
+                    state.stage = 1;
+                } else {
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn 
+                        ? `\\text{Girls cannot be adjacent.}` 
+                        : `\\text{女仔不能相鄰。}`;
+                    let ans = MathHelper.fact(4) * MathHelper.nCr(5, 3) * MathHelper.fact(3);
+                    correct = `4! \\times {}^5C_3 \\times 3! = ${ans}`;
+                    wrongs = [
+                        `4! \\times 3! = ${MathHelper.fact(4) * MathHelper.fact(3)}`,
+                        `5! \\times 3! = ${MathHelper.fact(5) * MathHelper.fact(3)}`,
+                        `4! \\times {}^4C_3 \\times 3! = ${MathHelper.fact(4) * MathHelper.nCr(4,3) * MathHelper.fact(3)}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            }
+
+        } else if (type === 3) { // 4. 聯立方程與 Delta
+            let subType = state.subType !== undefined ? state.subType : MathHelper.randInt(0, 3);
+            state.subType = subType;
+            
+            if (subType === 0) { // Simultaneous
+                if (state.stage === 0) {
+                    question = `\\begin{cases} y = x + 2 \\\\ y = x^2 - x - 1 \\end{cases}`;
+                    correct = `x^2 - x - 1 = x + 2`;
+                    wrongs = [`x^2 - x - 1 + x + 2 = 0`, `x^2 - 2x + 1 = 0`, `y = (x+2)^2 - (x+2) - 1`];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = `x^2 - x - 1 = x + 2`;
+                    correct = `x^2 - 2x - 3 = 0`;
+                    wrongs = [`x^2 - 3 = 0`, `x^2 + 2x + 1 = 0`, `x^2 - 2x + 1 = 0`];
+                    state.sharedVars.h2 = question;
+                    state.stage = 2;
+                } else {
+                    let { h1, h2 } = state.sharedVars;
+                    prevSteps = [h1, h2];
+                    question = `x^2 - 2x - 3 = 0`;
+                    correct = `(x - 3)(x + 1) = 0 \\Rightarrow x = 3, -1`;
+                    wrongs = [`(x + 3)(x - 1) = 0 \\Rightarrow x = -3, 1`, `(x - 3)(x - 1) = 0 \\Rightarrow x = 3, 1`, `x = 3`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 1) { // Delta
+                if (state.stage === 0) {
+                    let root = MathHelper.randInt(2, 6);
+                    let c = root * root; 
+                    let condType = MathHelper.randInt(0, 2); // 0: equal, 1: real (>=0), 2: no real (<0)
+                    state.sharedVars = { root, c, condType };
+                    
+                    let qStr, ansStr, w1, w2, w3;
+                    if (condType === 0) {
+                        qStr = isEn ? `x^2 + kx + ${c} = 0 \\\\ \\text{ has equal roots}` : `x^2 + kx + ${c} = 0 \\\\ \\text{ 有等根}`;
+                        ansStr = `\\Delta = k^2 - 4(1)(${c}) = 0`;
+                        w1 = `\\Delta = k^2 - 4(1)(${c}) > 0`; w2 = `\\Delta = k^2 - 4(1)(${c}) < 0`; w3 = `k^2 + ${4*c} = 0`;
+                    } else if (condType === 1) {
+                        qStr = isEn ? `x^2 + kx + ${c} = 0 \\\\ \\text{ has real roots}` : `x^2 + kx + ${c} = 0 \\\\ \\text{ 有實根}`;
+                        ansStr = `\\Delta = k^2 - 4(1)(${c}) \\ge 0`;
+                        w1 = `\\Delta = k^2 - 4(1)(${c}) > 0`; w2 = `\\Delta = k^2 - 4(1)(${c}) < 0`; w3 = `\\Delta = k^2 - 4(1)(${c}) \\le 0`;
+                    } else {
+                        qStr = isEn ? `x^2 + kx + ${c} = 0 \\\\ \\text{ has no real roots}` : `x^2 + kx + ${c} = 0 \\\\ \\text{ 沒有實根}`;
+                        ansStr = `\\Delta = k^2 - 4(1)(${c}) < 0`;
+                        w1 = `\\Delta = k^2 - 4(1)(${c}) \\le 0`; w2 = `\\Delta = k^2 - 4(1)(${c}) > 0`; w3 = `\\Delta = k^2 - 4(1)(${c}) = 0`;
+                    }
+                    question = qStr; correct = ansStr; wrongs = [w1, w2, w3];
+                    state.sharedVars.h1 = question.split('\\\\')[0];
+                    state.stage = 1;
+                } else {
+                    let { root, c, condType, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    let rSq = 4 * c;
+                    let r = 2 * root; 
+                    if (condType === 0) {
+                        question = `k^2 - ${rSq} = 0`;
+                        correct = `k^2 = ${rSq} \\Rightarrow k = \\pm ${r}`;
+                        wrongs = [`k = ${r}`, `k = -${r}`, `k = ${rSq}`];
+                    } else if (condType === 1) {
+                        question = `k^2 - ${rSq} \\ge 0`;
+                        correct = `k \\le -${r} \\text{ ${isEn?'or':'或'} } k \\ge ${r}`;
+                        wrongs = [`-${r} \\le k \\le ${r}`, `k < -${r} \\text{ ${isEn?'or':'或'} } k > ${r}`, `-${r} < k < ${r}`];
+                        svg = this.generateSVG('parabola', { root1: -r, root2: r }, isEn);
+                    } else {
+                        question = `k^2 - ${rSq} < 0`;
+                        correct = `-${r} < k < ${r}`;
+                        wrongs = [`k < -${r} \\text{ ${isEn?'or':'或'} } k > ${r}`, `-${r} \\le k \\le ${r}`, `k \\le -${r} \\text{ ${isEn?'or':'或'} } k \\ge ${r}`];
+                        svg = this.generateSVG('parabola', { root1: -r, root2: r }, isEn);
+                    }
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 2) { // Intersection Count
+                if (state.stage === 0) {
+                    let c = MathHelper.randInt(2, 5);
+                    state.sharedVars = { c };
+                    question = isEn ? `y=x^2 \\text{ and } y=2x-c \\text{ do not intersect.}` : `y=x^2 \\text{ 與 } y=2x-c \\text{ 沒有相交。}`;
+                    correct = `x^2 - 2x + ${c} = 0, \\Delta < 0`;
+                    wrongs = [`x^2 - 2x + ${c} = 0, \\Delta > 0`, `x^2 + 2x - ${c} = 0, \\Delta < 0`, `x^2 - 2x + ${c} = 0, \\Delta = 0`];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { c, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = `x^2 - 2x + c = 0, \\Delta < 0`;
+                    correct = `(-2)^2 - 4(1)(c) < 0`;
+                    wrongs = [`2^2 - 4(1)(c) > 0`, `(-2)^2 - 4(1)(-c) < 0`, `(-2)^2 + 4(1)(c) < 0`];
+                    state.sharedVars.h2 = question;
+                    state.stage = 2;
+                } else {
+                    let { h1, h2 } = state.sharedVars;
+                    prevSteps = [h1, h2];
+                    question = `4 - 4c < 0`;
+                    correct = `c > 1`;
+                    wrongs = [`c < 1`, `c > -1`, `c < -1`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else { // Circle & Line
+                if (state.stage === 0) {
+                    let r2 = MathHelper.randInt(2, 5) * 2;
+                    state.sharedVars = { r2 };
+                    question = `\\begin{cases} y = x \\\\ x^2 + y^2 = ${r2} \\end{cases}`;
+                    correct = `x^2 + x^2 = ${r2} \\Rightarrow 2x^2 = ${r2}`;
+                    wrongs = [`x^2 + x = ${r2}`, `2x^2 = ${r2}^2`, `x^2 + (x^2)^2 = ${r2}`];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else {
+                    let { r2, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = `2x^2 = ${r2}`;
+                    correct = `x = \\pm \\sqrt{${r2/2}}`;
+                    wrongs = [`x = \\sqrt{${r2/2}}`, `x = \\pm ${r2/2}`, `x = ${r2/2}`];
+                    state.stage = 0; delete state.subType;
+                }
+            }
+
+        } else { // 5. 轉換方程 Transformable Equations
+            let subType = state.subType !== undefined ? state.subType : MathHelper.randInt(0, 5);
+            state.subType = subType;
+
+            if (subType === 0) { // Exponential
+                if (state.stage === 0) {
+                    question = `4^x - 3(2^x) + 2 = 0`;
+                    correct = `(2^x)^2 - 3(2^x) + 2 = 0`;
+                    wrongs = [`(2^2)^x - 3^x(2^x) + 2 = 0`, `2^{2x} - 6^x + 2 = 0`, `16^x - 3(2^x) + 2 = 0`];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn ? `\\text{Let } u = 2^x\\text{, then } \\\\ u^2 - 3u + 2 = 0` : `\\text{設 } u = 2^x\\text{, 則 } \\\\ u^2 - 3u + 2 = 0`;
+                    correct = `(u - 2)(u - 1) = 0 \\Rightarrow u = 2, 1`;
+                    wrongs = [`(u + 2)(u + 1) = 0 \\Rightarrow u = -2, -1`, `u = 3, -1`, `(u - 2)(u + 1) = 0`];
+                    state.sharedVars.h2 = question;
+                    state.stage = 2;
+                } else {
+                    let { h1, h2 } = state.sharedVars;
+                    prevSteps = [h1, h2];
+                    question = isEn ? `u = 2 \\text{ or } u = 1 \\\\ (u = 2^x)` : `u = 2 \\text{ 或 } u = 1 \\\\ (u = 2^x)`;
+                    correct = `2^x = 2 \\Rightarrow x=1, \\quad 2^x = 1 \\Rightarrow x=0`;
+                    wrongs = [`x = 2, 1`, `x = 1`, `\\text{${isEn?'No real roots':'無實根'}}`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 1) { // Logarithmic
+                if (state.stage === 0) {
+                    question = `(\\log x)^2 - \\log x^2 - 3 = 0`;
+                    correct = `(\\log x)^2 - 2\\log x - 3 = 0`;
+                    wrongs = [`2\\log x - \\log x^2 - 3 = 0`, `(\\log x)^2 - (\\log x)^2 - 3 = 0`, `\\log x^2 - 2\\log x - 3 = 0`];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else {
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn ? `\\text{Let } u = \\log x\\text{, then } \\\\ u^2 - 2u - 3 = 0` : `\\text{設 } u = \\log x\\text{, 則 } \\\\ u^2 - 2u - 3 = 0`;
+                    correct = `(u - 3)(u + 1) = 0 \\Rightarrow u = 3, -1`;
+                    wrongs = [`(u + 3)(u - 1) = 0 \\Rightarrow u = -3, 1`, `u = 2, 3`, `u = 3`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 2) { // Surd
+                if (state.stage === 0) {
+                    question = `x - \\sqrt{x} - 6 = 0`;
+                    correct = `(\\sqrt{x})^2 - \\sqrt{x} - 6 = 0`;
+                    wrongs = [`(x)^2 - \\sqrt{x} - 6 = 0`, `x^2 - x - 36 = 0`, `x - x^{1/3} - 6 = 0`];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else {
+                    let { h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = isEn ? `\\text{Let } u = \\sqrt{x}\\text{, then } \\\\ u^2 - u - 6 = 0` : `\\text{設 } u = \\sqrt{x}\\text{, 則 } \\\\ u^2 - u - 6 = 0`;
+                    correct = `(u - 3)(u + 2) = 0 \\Rightarrow \\sqrt{x} = 3 \\text{ ${isEn?'(rej -2)':'(捨去 -2)'}}`;
+                    wrongs = [`(u + 3)(u - 2) = 0 \\Rightarrow \\sqrt{x} = -3`, `u = 3, 2 \\Rightarrow x = 9, 4`, `\\sqrt{x} = 3, -2`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 3) { // High power
+                if (state.stage === 0) {
+                    let r1 = MathHelper.randInt(1, 3);
+                    let r2 = MathHelper.randInt(4, 5);
+                    let sum = r1*r1 + r2*r2;
+                    let prod = r1*r1 * r2*r2;
+                    state.sharedVars = { r1, r2, sum, prod };
+                    question = `x^4 - ${sum}x^2 + ${prod} = 0`;
+                    correct = isEn ? `\\text{Let } u = x^2, u^2 - ${sum}u + ${prod} = 0` : `\\text{設 } u = x^2, u^2 - ${sum}u + ${prod} = 0`;
+                    wrongs = [
+                        isEn ? `\\text{Let } u = x^4, u^2 - ${sum}u + ${prod} = 0` : `\\text{設 } u = x^4, u^2 - ${sum}u + ${prod} = 0`,
+                        isEn ? `\\text{Let } u = x^2, u^2 + ${sum}u + ${prod} = 0` : `\\text{設 } u = x^2, u^2 + ${sum}u + ${prod} = 0`,
+                        isEn ? `\\text{Let } u = x, u^4 - ${sum}u^2 + ${prod} = 0` : `\\text{設 } u = x, u^4 - ${sum}u^2 + ${prod} = 0`
+                    ];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { r1, r2, sum, prod, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = `u^2 - ${sum}u + ${prod} = 0`;
+                    correct = `(u - ${r1*r1})(u - ${r2*r2}) = 0 \\Rightarrow u = ${r1*r1}, ${r2*r2}`;
+                    wrongs = [
+                        `(u + ${r1*r1})(u + ${r2*r2}) = 0 \\Rightarrow u = -${r1*r1}, -${r2*r2}`,
+                        `(u - ${r1})(u - ${r2}) = 0 \\Rightarrow u = ${r1}, ${r2}`,
+                        `u = ${r1}, ${r2}`
+                    ];
+                    state.sharedVars.h2 = question;
+                    state.stage = 2;
+                } else {
+                    let { r1, r2, h1, h2 } = state.sharedVars;
+                    prevSteps = [h1, h2];
+                    question = isEn ? `u = ${r1*r1} \\text{ or } u = ${r2*r2} \\\\ (u = x^2)` : `u = ${r1*r1} \\text{ 或 } u = ${r2*r2} \\\\ (u = x^2)`;
+                    correct = `x = \\pm ${r1}, \\pm ${r2}`;
+                    wrongs = [`x = ${r1}, ${r2}`, `x = \\pm ${r1*r1}, \\pm ${r2*r2}`, `x = ${r1*r1}, ${r2*r2}`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 4) { // Fractional
+                if (state.stage === 0) {
+                    let n = MathHelper.randInt(2, 4);
+                    state.sharedVars = { n };
+                    question = `\\frac{${n}}{x-2} + \\frac{1}{x+2} = \\frac{${n*2+2}}{x^2-4}`;
+                    correct = `\\times (x-2)(x+2) \\Rightarrow ${n}(x+2) + 1(x-2) = ${n*2+2}`;
+                    wrongs = [
+                        `\\times (x^2-4) \\Rightarrow ${n}(x-2) + 1(x+2) = ${n*2+2}`,
+                        `\\times (x-2) \\Rightarrow ${n} + x+2 = ${n*2+2}`,
+                        `\\frac{${n}+1}{2x} = \\frac{${n*2+2}}{x^2-4}`
+                    ];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else {
+                    let { n, h1 } = state.sharedVars;
+                    prevSteps = [h1];
+                    question = `${n}(x+2) + 1(x-2) = ${n*2+2}`;
+                    correct = `${n+1}x + ${2*n-2} = ${n*2+2} \\Rightarrow x = \\frac{4}{${n+1}}`;
+                    wrongs = [
+                        `${n+1}x = ${n*2+2} \\Rightarrow x = 2`,
+                        `${n+1}x - ${2*n-2} = ${n*2+2} \\Rightarrow x = \\frac{4n}{${n+1}}`,
+                        `${n}x + 2 + x - 2 = ${n*2+2} \\Rightarrow x = \\frac{${n*2+2}}{${n+1}}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            } else { // Trig equation (Supports both sin and cos, 1 or 2 horizontal lines with visual SVG)
+                const trigScenarios = [
+                    {
+                        func: 'sin',
+                        eq1: `2\\sin^2\\theta - \\sin\\theta - 1 = 0`,
+                        step1En: `\\text{Let } u = \\sin\\theta, 2u^2 - u - 1 = 0`,
+                        step1Zh: `\\text{設 } u = \\sin\\theta, 2u^2 - u - 1 = 0`,
+                        w1En: `\\text{Let } u = \\cos\\theta, 2u^2 - u - 1 = 0`,
+                        w1Zh: `\\text{設 } u = \\cos\\theta, 2u^2 - u - 1 = 0`,
+                        w2: `2\\sin\\theta(\\sin\\theta - 1) = 1`,
+                        w3: `(2\\sin\\theta - 1)(\\sin\\theta + 1) = 0`,
+                        eq2: `2u^2 - u - 1 = 0`,
+                        step2: `(2u + 1)(u - 1) = 0 \\Rightarrow u = -0.5, 1`,
+                        w2_1: `(2u - 1)(u + 1) = 0 \\Rightarrow u = 0.5, -1`,
+                        w2_2: `(2u + 1)(u + 1) = 0 \\Rightarrow u = -0.5, -1`,
+                        w2_3: `u = -0.5`,
+                        eq3En: `\\sin\\theta = -0.5 \\text{ or } \\sin\\theta = 1 \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        eq3Zh: `\\sin\\theta = -0.5 \\text{ 或 } \\sin\\theta = 1 \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        ans3En: `2 \\text{ roots } + 1 \\text{ root } = 3 \\text{ roots}`,
+                        ans3Zh: `2 \\text{ 個根 } + 1 \\text{ 個根 } = 3 \\text{ 個根}`,
+                        w3_1En: `1 \\text{ root } + 1 \\text{ root } = 2 \\text{ roots}`,
+                        w3_1Zh: `1 \\text{ 個根 } + 1 \\text{ 個根 } = 2 \\text{ 個根}`,
+                        w3_2En: `2 \\text{ roots } + 2 \\text{ roots } = 4 \\text{ roots}`,
+                        w3_2Zh: `2 \\text{ 個根 } + 2 \\text{ 個根 } = 4 \\text{ 個根}`,
+                        w3_3En: `0 \\text{ roots } + 1 \\text{ root } = 1 \\text{ root}`,
+                        w3_3Zh: `0 \\text{ 個根 } + 1 \\text{ 個根 } = 1 \\text{ 個根}`,
+                        lines: [
+                            { val: 1, label: 'y=1', color: '#ffee00' },
+                            { val: -0.5, label: 'y=-0.5', color: '#ff4500' }
+                        ]
+                    },
+                    {
+                        func: 'cos',
+                        eq1: `2\\cos^2\\theta + \\cos\\theta - 1 = 0`,
+                        step1En: `\\text{Let } u = \\cos\\theta, 2u^2 + u - 1 = 0`,
+                        step1Zh: `\\text{設 } u = \\cos\\theta, 2u^2 + u - 1 = 0`,
+                        w1En: `\\text{Let } u = \\sin\\theta, 2u^2 + u - 1 = 0`,
+                        w1Zh: `\\text{設 } u = \\sin\\theta, 2u^2 + u - 1 = 0`,
+                        w2: `2\\cos\\theta(\\cos\\theta + 1) = 1`,
+                        w3: `(2\\cos\\theta + 1)(\\cos\\theta - 1) = 0`,
+                        eq2: `2u^2 + u - 1 = 0`,
+                        step2: `(2u - 1)(u + 1) = 0 \\Rightarrow u = 0.5, -1`,
+                        w2_1: `(2u + 1)(u - 1) = 0 \\Rightarrow u = -0.5, 1`,
+                        w2_2: `(2u - 1)(u - 1) = 0 \\Rightarrow u = 0.5, 1`,
+                        w2_3: `u = 0.5`,
+                        eq3En: `\\cos\\theta = 0.5 \\text{ or } \\cos\\theta = -1 \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        eq3Zh: `\\cos\\theta = 0.5 \\text{ 或 } \\cos\\theta = -1 \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        ans3En: `2 \\text{ roots } + 1 \\text{ root } = 3 \\text{ roots}`,
+                        ans3Zh: `2 \\text{ 個根 } + 1 \\text{ 個根 } = 3 \\text{ 個根}`,
+                        w3_1En: `1 \\text{ root } + 1 \\text{ root } = 2 \\text{ roots}`,
+                        w3_1Zh: `1 \\text{ 個根 } + 1 \\text{ 個根 } = 2 \\text{ 個根}`,
+                        w3_2En: `2 \\text{ roots } + 2 \\text{ roots } = 4 \\text{ roots}`,
+                        w3_2Zh: `2 \\text{ 個根 } + 2 \\text{ 個根 } = 4 \\text{ 個根}`,
+                        w3_3En: `1 \\text{ root } + 0 \\text{ roots } = 1 \\text{ root}`,
+                        w3_3Zh: `1 \\text{ 個根 } + 0 \\text{ 個根 } = 1 \\text{ 個根}`,
+                        lines: [
+                            { val: 0.5, label: 'y=0.5', color: '#ffee00' },
+                            { val: -1, label: 'y=-1', color: '#ff4500' }
+                        ]
+                    },
+                    {
+                        func: 'cos',
+                        eq1: `2\\cos^2\\theta - 3\\cos\\theta - 2 = 0`,
+                        step1En: `\\text{Let } u = \\cos\\theta, 2u^2 - 3u - 2 = 0`,
+                        step1Zh: `\\text{設 } u = \\cos\\theta, 2u^2 - 3u - 2 = 0`,
+                        w1En: `\\text{Let } u = \\sin\\theta, 2u^2 - 3u - 2 = 0`,
+                        w1Zh: `\\text{設 } u = \\sin\\theta, 2u^2 - 3u - 2 = 0`,
+                        w2: `\\cos\\theta(2\\cos\\theta - 3) = 2`,
+                        w3: `(2\\cos\\theta - 1)(\\cos\\theta + 2) = 0`,
+                        eq2: `2u^2 - 3u - 2 = 0`,
+                        step2: `(2u + 1)(u - 2) = 0 \\Rightarrow u = -0.5 \\text{ ${isEn?'(rej 2)':'(捨去 2)'}}`,
+                        w2_1: `(2u - 1)(u + 2) = 0 \\Rightarrow u = 0.5, -2`,
+                        w2_2: `u = -0.5, 2`,
+                        w2_3: `u = 2`,
+                        eq3En: `\\cos\\theta = -0.5 \\text{ (1 valid line)} \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        eq3Zh: `\\cos\\theta = -0.5 \\text{ (僅1條有效水平線)} \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        ans3En: `2 \\text{ roots}`,
+                        ans3Zh: `2 \\text{ 個根}`,
+                        w3_1En: `1 \\text{ root}`,
+                        w3_1Zh: `1 \\text{ 個根}`,
+                        w3_2En: `3 \\text{ roots}`,
+                        w3_2Zh: `3 \\text{ 個根}`,
+                        w3_3En: `4 \\text{ roots}`,
+                        w3_3Zh: `4 \\text{ 個根}`,
+                        lines: [
+                            { val: -0.5, label: 'y=-0.5', color: '#ffee00' }
+                        ]
+                    },
+                    {
+                        func: 'sin',
+                        eq1: `2\\sin^2\\theta + 5\\sin\\theta + 2 = 0`,
+                        step1En: `\\text{Let } u = \\sin\\theta, 2u^2 + 5u + 2 = 0`,
+                        step1Zh: `\\text{設 } u = \\sin\\theta, 2u^2 + 5u + 2 = 0`,
+                        w1En: `\\text{Let } u = \\cos\\theta, 2u^2 + 5u + 2 = 0`,
+                        w1Zh: `\\text{設 } u = \\cos\\theta, 2u^2 + 5u + 2 = 0`,
+                        w2: `\\sin\\theta(2\\sin\\theta + 5) = -2`,
+                        w3: `(2\\sin\\theta - 1)(\\sin\\theta - 2) = 0`,
+                        eq2: `2u^2 + 5u + 2 = 0`,
+                        step2: `(2u + 1)(u + 2) = 0 \\Rightarrow u = -0.5 \\text{ ${isEn?'(rej -2)':'(捨去 -2)'}}`,
+                        w2_1: `(2u - 1)(u - 2) = 0 \\Rightarrow u = 0.5, 2`,
+                        w2_2: `u = -0.5, -2`,
+                        w2_3: `u = -2`,
+                        eq3En: `\\sin\\theta = -0.5 \\text{ (1 valid line)} \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        eq3Zh: `\\sin\\theta = -0.5 \\text{ (僅1條有效水平線)} \\\\ (0^\\circ \\le \\theta < 360^\\circ)`,
+                        ans3En: `2 \\text{ roots}`,
+                        ans3Zh: `2 \\text{ 個根}`,
+                        w3_1En: `1 \\text{ root}`,
+                        w3_1Zh: `1 \\text{ 個根}`,
+                        w3_2En: `3 \\text{ roots}`,
+                        w3_2Zh: `3 \\text{ 個根}`,
+                        w3_3En: `0 \\text{ roots}`,
+                        w3_3Zh: `0 \\text{ 個根}`,
+                        lines: [
+                            { val: -0.5, label: 'y=-0.5', color: '#ffee00' }
+                        ]
+                    }
+                ];
+
+                if (state.stage === 0) {
+                    let sIdx = MathHelper.randInt(0, trigScenarios.length - 1);
+                    state.sharedVars.sIdx = sIdx;
+                    let sc = trigScenarios[sIdx];
+                    question = `${sc.eq1} \\\\ (0^\\circ \\le \\theta < 360^\\circ)`;
+                    correct = isEn ? sc.step1En : sc.step1Zh;
+                    wrongs = [isEn ? sc.w1En : sc.w1Zh, sc.w2, sc.w3];
+                    state.sharedVars.h1 = question;
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { h1, sIdx } = state.sharedVars;
+                    let sc = trigScenarios[sIdx];
+                    prevSteps = [h1];
+                    question = sc.eq2;
+                    correct = sc.step2;
+                    wrongs = [sc.w2_1, sc.w2_2, sc.w2_3];
+                    state.sharedVars.h2 = question;
+                    state.stage = 2;
+                } else {
+                    let { h1, h2, sIdx } = state.sharedVars;
+                    let sc = trigScenarios[sIdx];
+                    prevSteps = [h1, h2];
+                    question = isEn ? sc.eq3En : sc.eq3Zh;
+                    correct = isEn ? sc.ans3En : sc.ans3Zh;
+                    wrongs = [
+                        isEn ? sc.w3_1En : sc.w3_1Zh,
+                        isEn ? sc.w3_2En : sc.w3_2Zh,
+                        isEn ? sc.w3_3En : sc.w3_3Zh
+                    ];
+                    svg = this.generateSVG('trig_graph', { func: sc.func, lines: sc.lines }, isEn);
+                    state.stage = 0; delete state.subType;
+                }
+            }
+        }
+
+        if(!correct) { correct = "0"; wrongs = ["1","2","3"]; question="\\text{Error}"; }
+
+        let options = wrongs.slice(0, 3);
+        const correctIdx = Math.floor(Math.random() * 4);
+        options.splice(correctIdx, 0, correct);
+
+        return { question, options, correctIdx, svg, prevSteps };
+    }
+};
+
+// ============================================================================
+// ⚙️ 區塊 2：核心技能與遊戲引擎 (CORE SKILLS & GAME ENGINE)
+// ============================================================================
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const modalContainer = document.getElementById('modal-container');
+const startScreen = document.getElementById('start-screen');
+const levelupScreen = document.getElementById('levelup-screen');
+const gameoverScreen = document.getElementById('gameover-screen');
+
+const btnStartZh = document.getElementById('btn-start-zh');
+const btnStartEn = document.getElementById('btn-start-en');
+const btnRestart = document.getElementById('btn-restart');
+const btnContinue = document.getElementById('btn-continue');
+
+const uiLevel = document.getElementById('ui-level');
+const uiTimer = document.getElementById('ui-timer');
+const uiHp = document.getElementById('ui-hp');
+const uiMaxHp = document.getElementById('ui-maxhp');
+const uiKills = document.getElementById('ui-kills');
+const expBar = document.getElementById('exp-bar');
+const quizTimerBar = document.getElementById('quiz-timer-bar');
+const quizTimerText = document.getElementById('quiz-timer-text');
+const joystickZone = document.getElementById('joystick-zone');
+const joystickStick = document.getElementById('joystick-stick');
+
+const GAME_DURATION = 10 * 60 * 1000;
+const QUIZ_INTERVAL = 5000;
+const QUIZ_TIME_LIMIT = 60;
+const WORLD_SIZE = { width: 4000, height: 4000 };
+
+let gameState = 'START'; 
+let currentLang = 'zh';
+let lastTime = 0, gameTime = 0, timeSinceLastQuiz = 0, activeShockwaveBurstTimer = 0;
+let animationFrameId, quizTimerInterval;
+let camera = { x: 0, y: 0 };
+let joystickVector = { x: 0, y: 0 };
+const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
+let player, enemies = [], particles = [], projectiles = [], floatingTexts = [], kills = 0;
+let currentQuizzesData = [], currentUpgrades = [], quizResults = [null, null, null], activeQuizzes = 3, quizTimeLeft = QUIZ_TIME_LIMIT;
+
+const weaponDetails = {
+    meteor: { name: '流星錘', color: '#00ffff', icon: '☄️', uiId: 'progress-meteor' },
+    lightning: { name: '連環閃電', color: '#b500ff', icon: '⚡', uiId: 'progress-lightning' },
+    firestorm: { name: '火燒連環', color: '#ff4500', icon: '🔥', uiId: 'progress-firestorm' },
+    shockwave: { name: '衝擊波', color: '#ffee00', icon: '💥', uiId: 'progress-shockwave' }
+};
+
+document.getElementById('main-title-text').innerText = TopicConfig.titleZh;
+document.getElementById('sub-title-text').innerText = TopicConfig.titleEn;
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    joystickZone.style.display = (window.innerWidth < 768 || 'ontouchstart' in window) ? 'block' : 'none';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+window.addEventListener('keydown', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+window.addEventListener('keyup', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+let isDraggingJoystick = false, joyCenter = { x: 0, y: 0 }; const maxJoyDist = 40;
+joystickZone.addEventListener('touchstart', (e) => {
+    e.preventDefault(); isDraggingJoystick = true;
+    const rect = joystickZone.getBoundingClientRect();
+    joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+joystickZone.addEventListener('touchmove', (e) => {
+    e.preventDefault(); if (isDraggingJoystick) updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+const resetJoystick = () => {
+    isDraggingJoystick = false; joystickStick.style.transform = `translate(0px, 0px)`; joystickVector = { x: 0, y: 0 };
+};
+joystickZone.addEventListener('touchend', resetJoystick);
+joystickZone.addEventListener('touchcancel', resetJoystick);
+
+function updateJoystick(tx, ty) {
+    let dx = tx - joyCenter.x; let dy = ty - joyCenter.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > maxJoyDist) { dx = (dx / dist) * maxJoyDist; dy = (dy / dist) * maxJoyDist; }
+    joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+    joystickVector.x = dx / maxJoyDist; joystickVector.y = dy / maxJoyDist;
+}
+
+function getDistance(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
+function randRange(min, max) { return Math.random() * (max - min) + min; }
+function getRandomElement(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+class BasicBullet {
+    constructor(x, y, targetX, targetY, damage) {
+        this.x = x; this.y = y; this.damage = damage; this.radius = 4; this.active = true;
+        const angle = Math.atan2(targetY - y, targetX - x);
+        this.vx = Math.cos(angle) * 450; this.vy = Math.sin(angle) * 450;
+    }
+    update(dt) {
+        if (!this.active) return;
+        this.x += this.vx * dt; this.y += this.vy * dt;
+        for (let e of enemies) {
+            if (getDistance(this.x, this.y, e.x, e.y) < this.radius + e.radius) {
+                e.takeDamage(this.damage);
+                createHitParticles(this.x, this.y, '#00f2fe', 3);
+                this.active = false; break;
+            }
+        }
+        if (getDistance(this.x, this.y, player.x, player.y) > 800) this.active = false;
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur = 10; ctx.shadowColor = '#00f2fe'; ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+}
+
+class Player {
+    constructor() {
+        this.x = WORLD_SIZE.width / 2; this.y = WORLD_SIZE.height / 2;
+        this.radius = 16; this.speed = 220; this.maxHp = 100; this.hp = this.maxHp;
+        this.level = 1; this.orbitAngle = 0; this.facing = 1;
+        this.isTakingDamage = false;
+        this.basicWeapon = { baseCooldown: 0.8, cooldown: 0.8, timer: 0, baseDamage: 15, damage: 15 };
+        this.weapons = {
+            meteor: { level: 0, count: 0, damage: 30, radius: 100, active: false },
+            lightning: { level: 0, cooldown: 1.5, timer: 0, damage: 45, chains: 2, active: false },
+            firestorm: { level: 0, cooldown: 2.0, timer: 0, damage: 25, active: false },
+            shockwave: { level: 0, cooldown: 3.0, timer: 0, damage: 60, maxRadius: 250, active: false }
+        };
+    }
+    update(dt) {
+        let dx = 0, dy = 0;
+        if (keys.w || keys.ArrowUp) dy -= 1; if (keys.s || keys.ArrowDown) dy += 1;
+        if (keys.a || keys.ArrowLeft) dx -= 1; if (keys.d || keys.ArrowRight) dx += 1;
+        if (dx === 0 && dy === 0) { dx = joystickVector.x; dy = joystickVector.y; }
+
+        if (dx !== 0 || dy !== 0) {
+            const len = Math.hypot(dx, dy); dx /= len; dy /= len;
+            this.x += dx * this.speed * dt; this.y += dy * this.speed * dt;
+            this.facing = dx > 0 ? 1 : (dx < 0 ? -1 : this.facing);
+        }
+
+        this.x = Math.max(this.radius, Math.min(WORLD_SIZE.width - this.radius, this.x));
+        this.y = Math.max(this.radius, Math.min(WORLD_SIZE.height - this.radius, this.y));
+        this.orbitAngle += dt * 3; 
+
+        const lvlBoost = Math.floor((this.level - 1) / 2);
+        this.basicWeapon.damage = this.basicWeapon.baseDamage + (lvlBoost * 5);
+        this.basicWeapon.cooldown = Math.max(0.1, this.basicWeapon.baseCooldown * Math.pow(0.9, lvlBoost));
+
+        this.basicWeapon.timer += dt;
+        if (this.basicWeapon.timer >= this.basicWeapon.cooldown) {
+            this.basicWeapon.timer = 0;
+            if(enemies.length > 0) {
+                let nearest = null, minDist = Infinity;
+                enemies.forEach(e => { const d = getDistance(this.x, this.y, e.x, e.y); if(d < minDist){ minDist=d; nearest=e; }});
+                if(nearest) projectiles.push(new BasicBullet(this.x, this.y, nearest.x, nearest.y, this.basicWeapon.damage));
+            }
+        }
+        this.updateWeapons(dt);
+        
+        if (!this.isTakingDamage && this.hp < this.maxHp && this.hp > 0) {
+            this.hp = Math.min(this.maxHp, this.hp + 5 * dt);
+        }
+        this.isTakingDamage = false;
+
+        uiHp.innerText = Math.max(0, Math.floor(this.hp));
+        uiMaxHp.innerText = this.maxHp;
+    }
+
+    updateWeapons(dt) {
+        if (this.weapons.meteor.active) {
+            const w = this.weapons.meteor;
+            const count = w.count + (w.level > 1 ? Math.floor(w.level / 2) : 0);
+            const radius = w.radius + w.level * 10;
+            const dmg = w.damage + w.level * 10;
+            for (let i = 0; i < count; i++) {
+                const mx = this.x + Math.cos(this.orbitAngle + (i*Math.PI*2)/count) * radius;
+                const my = this.y + Math.sin(this.orbitAngle + (i*Math.PI*2)/count) * radius;
+                particles.push(new TrailParticle(mx, my, '#00ffff'));
+                enemies.forEach(e => {
+                    if (getDistance(mx, my, e.x, e.y) < 20 + e.radius && Math.random() < 0.2) {
+                        e.takeDamage(dmg * dt * 10); createHitParticles(e.x, e.y, '#00ffff', 2);
+                    }
+                });
+            }
+        }
+        if (this.weapons.lightning.active) {
+            this.weapons.lightning.timer += dt;
+            if (this.weapons.lightning.timer >= Math.max(0.5, this.weapons.lightning.cooldown - this.weapons.lightning.level * 0.1)) {
+                this.weapons.lightning.timer = 0; this.fireLightning();
+            }
+        }
+        if (this.weapons.firestorm.active) {
+            this.weapons.firestorm.timer += dt;
+            if (this.weapons.firestorm.timer >= Math.max(0.8, this.weapons.firestorm.cooldown - this.weapons.firestorm.level * 0.15)) {
+                this.weapons.firestorm.timer = 0; this.fireFirestorm();
+            }
+        }
+        if (activeShockwaveBurstTimer > 0) {
+            activeShockwaveBurstTimer -= dt;
+            if (Math.random() < 0.3) projectiles.push(new ShockwaveEffect(this.x, this.y, 320, 80));
+        }
+        if (this.weapons.shockwave.active) {
+            this.weapons.shockwave.timer += dt;
+            if (this.weapons.shockwave.timer >= Math.max(1.2, this.weapons.shockwave.cooldown - this.weapons.shockwave.level * 0.2)) {
+                this.weapons.shockwave.timer = 0;
+                projectiles.push(new ShockwaveEffect(this.x, this.y, this.weapons.shockwave.maxRadius + this.weapons.shockwave.level * 30, this.weapons.shockwave.damage + this.weapons.shockwave.level * 20));
+            }
+        }
+    }
+    
+    fireLightning() {
+        if(enemies.length === 0) return;
+        const dmg = this.weapons.lightning.damage + this.weapons.lightning.level * 15;
+        let chainsLeft = this.weapons.lightning.chains + this.weapons.lightning.level;
+        let currentTarget = null, minDist = Infinity;
+        enemies.forEach(e => { const d = getDistance(this.x, this.y, e.x, e.y); if (d < minDist) { minDist = d; currentTarget = e; }});
+        if(!currentTarget) return;
+        let origin = { x: this.x, y: this.y }, hitEnemies = new Set(), strikePoints = [origin];
+        while (chainsLeft > 0 && currentTarget) {
+            hitEnemies.add(currentTarget); strikePoints.push({ x: currentTarget.x, y: currentTarget.y });
+            currentTarget.takeDamage(dmg); origin = currentTarget; chainsLeft--; currentTarget = null; minDist = 400;
+            enemies.forEach(e => { if (!hitEnemies.has(e)) { const d = getDistance(origin.x, origin.y, e.x, e.y); if (d < minDist) { minDist = d; currentTarget = e; }}});
+        }
+        projectiles.push(new LightningStrike(strikePoints));
+    }
+
+    fireFirestorm() {
+        if(enemies.length === 0) return;
+        const numFireballs = 1 + Math.floor(this.weapons.firestorm.level / 2);
+        const dmg = this.weapons.firestorm.damage + this.weapons.firestorm.level * 8;
+        const poolRad = 60 + this.weapons.firestorm.level * 15;
+        for (let i = 0; i < numFireballs; i++) {
+            const target = getRandomElement(enemies);
+            if (target) setTimeout(() => projectiles.push(new Fireball(this.x, this.y, target.x, target.y, dmg, poolRad)), i * 150);
+        }
+    }
+
+    takeDamage(amount) {
+        this.isTakingDamage = true;
+        this.hp -= amount;
+        if (this.hp <= 0 && gameState === 'PLAYING') endGame(false);
+    }
+
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y);
+        if (this.weapons.meteor.active) {
+            ctx.shadowBlur = 20; ctx.shadowColor = '#00ffff'; ctx.fillStyle = '#ccffff';
+            const w = this.weapons.meteor;
+            const count = w.count + (w.level > 1 ? Math.floor(w.level / 2) : 0);
+            const radius = w.radius + w.level * 10;
+            for (let i = 0; i < count; i++) {
+                const angle = this.orbitAngle + (i * Math.PI * 2) / count;
+                const mx = Math.cos(angle) * radius, my = Math.sin(angle) * radius;
+                ctx.beginPath();
+                for(let j=0; j<6; j++) {
+                    const sa = angle + (j*Math.PI/3) + this.orbitAngle*5;
+                    ctx.lineTo(mx + Math.cos(sa)*15, my + Math.sin(sa)*15); ctx.lineTo(mx + Math.cos(sa+Math.PI/6)*8, my + Math.sin(sa+Math.PI/6)*8);
+                }
+                ctx.closePath(); ctx.fill();
+            }
+        }
+        ctx.rotate(this.facing === 1 ? Math.PI / 2 : -Math.PI / 2);
+        ctx.shadowBlur = 20; ctx.shadowColor = '#00f2fe'; ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.moveTo(0, -this.radius * 1.2); ctx.lineTo(this.radius, this.radius); ctx.lineTo(0, this.radius * 0.5); ctx.lineTo(-this.radius, this.radius); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Enemy {
+    constructor(x, y, hp, speed, damage, color, type = 'square') {
+        this.x = x; this.y = y; this.maxHp = hp; this.hp = hp; this.speed = speed; this.damage = damage; this.color = color; this.type = type;
+        this.radius = type === 'boss' ? 24 : 14; this.flash = 0;
+    }
+    update(dt) {
+        const dx = player.x - this.x, dy = player.y - this.y, dist = Math.hypot(dx, dy);
+        let vx = 0, vy = 0; if (dist > 0) { vx = (dx / dist) * this.speed; vy = (dy / dist) * this.speed; }
+        for (let i = 0; i < enemies.length; i++) {
+            if (enemies[i] === this) continue;
+            const d = getDistance(this.x, this.y, enemies[i].x, enemies[i].y);
+            if (d < this.radius * 2) {
+                const pushStr = (this.radius * 2 - d) * 2;
+                this.x -= (enemies[i].x - this.x) / d * pushStr * dt; this.y -= (enemies[i].y - this.y) / d * pushStr * dt;
+            }
+        }
+        this.x += vx * dt; this.y += vy * dt;
+        if (getDistance(this.x, this.y, player.x, player.y) < this.radius + player.radius) player.takeDamage(this.damage * dt);
+        
+        if(this.flash > 0) this.flash -= dt * 6; 
+    }
+    takeDamage(amount) {
+        this.hp -= amount; this.flash = 1.0;
+        floatingTexts.push({ x: this.x + randRange(-15, 15), y: this.y - 20, text: Math.floor(amount), life: 0.8, color: '#fff' });
+        if (this.hp <= 0) {
+            const idx = enemies.indexOf(this); if (idx > -1) enemies.splice(idx, 1);
+            kills++; uiKills.innerText = kills;
+            createHitParticles(this.x, this.y, this.color, this.type === 'boss' ? 25 : 8);
+        }
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+        ctx.strokeStyle = this.color; ctx.fillStyle = this.flash > 0 ? '#fff' : '#111';
+        
+        ctx.lineWidth = 2; ctx.beginPath();
+        if (this.type === 'square') { ctx.rect(-this.radius, -this.radius, this.radius*2, this.radius*2); } 
+        else if (this.type === 'triangle') { ctx.moveTo(0, -this.radius); ctx.lineTo(this.radius, this.radius); ctx.lineTo(-this.radius, this.radius); ctx.closePath(); } 
+        else if (this.type === 'boss') { ctx.arc(0, 0, this.radius, 0, Math.PI*2); ctx.moveTo(0, -this.radius); ctx.lineTo(0, this.radius); ctx.moveTo(-this.radius, 0); ctx.lineTo(this.radius, 0); }
+        ctx.fill(); ctx.stroke();
+        if (this.type === 'boss' && this.hp < this.maxHp) {
+            ctx.fillStyle = '#333'; ctx.fillRect(-this.radius, -this.radius - 10, this.radius * 2, 4);
+            ctx.fillStyle = '#f00'; ctx.fillRect(-this.radius, -this.radius - 10, (this.radius * 2) * (this.hp / this.maxHp), 4);
+        }
+        ctx.restore();
+    }
+}
+
+class ShockwaveEffect {
+    constructor(x, y, maxRad, dmg) { this.x=x; this.y=y; this.rad=10; this.maxRad=maxRad; this.dmg=dmg; this.hit=new Set(); this.active=true; }
+    update(dt) {
+        if(!this.active) return; this.rad += 500*dt;
+        enemies.forEach(e => {
+            if(!this.hit.has(e)) {
+                const dist = getDistance(this.x, this.y, e.x, e.y);
+                if(dist <= this.rad || Math.abs(dist - this.rad) < 30) {
+                    e.takeDamage(this.dmg); this.hit.add(e); createHitParticles(e.x, e.y, '#ffee00', 5);
+                    const ang = Math.atan2(e.y - this.y, e.x - this.x); e.x += Math.cos(ang)*40; e.y += Math.sin(ang)*40;
+                }
+            }
+        });
+        if(this.rad >= this.maxRad) this.active = false;
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); const a = Math.max(0, 1-(this.rad/this.maxRad));
+        ctx.beginPath(); ctx.arc(0,0,this.rad,0,Math.PI*2); ctx.strokeStyle = `rgba(255,238,0,${a})`; ctx.lineWidth=12; ctx.shadowBlur=25; ctx.shadowColor='#ffee00'; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0,0,Math.max(0,this.rad-15),0,Math.PI*2); ctx.strokeStyle = `rgba(255,255,255,${a*0.8})`; ctx.lineWidth=4; ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class LightningStrike {
+    constructor(points) {
+        this.life = 0.3; this.maxLife = 0.3; this.active = true; this.jpts = [];
+        for(let i=0; i<points.length-1; i++){
+            this.jpts.push(points[i]); const steps = Math.max(1, Math.floor(getDistance(points[i].x,points[i].y,points[i+1].x,points[i+1].y)/30));
+            for(let j=1; j<steps; j++) this.jpts.push({ x: points[i].x + (points[i+1].x-points[i].x)*(j/steps) + randRange(-20,20), y: points[i].y + (points[i+1].y-points[i].y)*(j/steps) + randRange(-20,20) });
+        }
+        this.jpts.push(points[points.length-1]);
+    }
+    update(dt) { this.life -= dt; this.active = this.life > 0; }
+    draw(ctx) {
+        ctx.save(); ctx.globalAlpha = Math.max(0, this.life/this.maxLife); ctx.beginPath(); ctx.moveTo(this.jpts[0].x, this.jpts[0].y);
+        for(let i=1; i<this.jpts.length; i++) ctx.lineTo(this.jpts[i].x, this.jpts[i].y);
+        ctx.lineJoin='round'; ctx.shadowBlur=30; ctx.shadowColor='#b500ff'; ctx.strokeStyle='#e085ff'; ctx.lineWidth=6; ctx.stroke();
+        ctx.shadowBlur=0; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.stroke(); ctx.restore();
+    }
+}
+
+class Fireball {
+    constructor(sx,sy,tx,ty,dmg,poolRad) {
+        this.x=sx; this.y=sy; this.tx=tx; this.ty=ty; this.dmg=dmg; this.poolRad=poolRad; this.active=true;
+        const ang = Math.atan2(ty-sy, tx-sx); this.vx = Math.cos(ang)*600; this.vy = Math.sin(ang)*600;
+    }
+    update(dt) {
+        if(!this.active) return; particles.push(new Particle(this.x, this.y, '#ff4500'));
+        this.x += this.vx*dt; this.y += this.vy*dt;
+        if(getDistance(this.x,this.y,this.tx,this.ty) < 20) {
+            this.active=false; createHitParticles(this.tx,this.ty,'#ff4500',20); projectiles.push(new FirePool(this.tx,this.ty,this.poolRad,this.dmg));
+        }
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur=20; ctx.shadowColor='#ff4500'; ctx.fillStyle='#ffaa00'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+}
+
+class FirePool {
+    constructor(x,y,rad,dmg) { this.x=x; this.y=y; this.rad=rad; this.dmg=dmg; this.life=3; this.maxLife=3; this.active=true; this.type='firepool'; }
+    update(dt) {
+        if(!this.active) return; this.life -= dt; if(this.life <= 0) { this.active=false; return; }
+        enemies.forEach(e => { if(getDistance(this.x,this.y,e.x,e.y) < this.rad+e.radius) e.takeDamage(this.dmg*dt); });
+        if(Math.random()<0.3) particles.push(new Particle(this.x+randRange(-this.rad,this.rad), this.y+randRange(-this.rad,this.rad), '#ff4500'));
+    }
+    draw(ctx) {
+        ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.translate(this.x,this.y); const a = Math.min(1,this.life)*0.5;
+        const grad = ctx.createRadialGradient(0,0,0,0,0,this.rad); grad.addColorStop(0,`rgba(255,170,0,${a})`); grad.addColorStop(0.5,`rgba(255,69,0,${a*0.6})`); grad.addColorStop(1,'rgba(255,0,0,0)');
+        ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(0,0,this.rad,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+}
+
+class TrailParticle {
+    constructor(x,y,c) { this.x=x; this.y=y; this.c=c; this.life=0.2; this.maxLife=0.2; }
+    update(dt) { this.life-=dt; return this.life>0; }
+    draw(ctx) { ctx.globalAlpha=Math.max(0,this.life/this.maxLife); ctx.fillStyle=this.c; ctx.beginPath(); ctx.arc(this.x,this.y,4,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1.0; }
+}
+
+class Particle {
+    constructor(x,y,c) {
+        this.x=x; this.y=y; this.c=c; const ang=Math.random()*Math.PI*2; const spd=randRange(50,200);
+        this.vx=Math.cos(ang)*spd; this.vy=Math.sin(ang)*spd; this.life=randRange(0.3,0.6); this.maxLife=this.life; this.size=randRange(2,5);
+    }
+    update(dt) { this.x+=this.vx*dt; this.y+=this.vy*dt; this.vx*=0.95; this.vy*=0.95; this.life-=dt; return this.life>0; }
+    draw(ctx) { ctx.globalAlpha=Math.max(0,this.life/this.maxLife); ctx.fillStyle=this.c; ctx.shadowBlur=10; ctx.shadowColor=this.c; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1.0; ctx.shadowBlur=0; }
+}
+
+function createHitParticles(x, y, color, count) { for (let i=0; i<count; i++) particles.push(new Particle(x, y, color)); }
+
+function startGame(lang = 'zh') {
+    currentLang = lang; gameState = 'PLAYING';
+    modalContainer.classList.add('hidden'); startScreen.classList.add('hidden'); gameoverScreen.classList.add('hidden'); levelupScreen.classList.add('hidden');
+    
+    const isEn = lang === 'en';
+    document.title = isEn ? TopicConfig.titleEn : TopicConfig.titleZh;
+    document.getElementById('lbl-level').innerText = isEn ? 'LEVEL' : '系統評級';
+    document.getElementById('lbl-meteor').innerText = isEn ? 'Meteor' : '流星';
+    document.getElementById('lbl-lightning').innerText = isEn ? 'Lightning' : '閃電';
+    document.getElementById('lbl-firestorm').innerText = isEn ? 'Fire' : '火燒';
+    document.getElementById('lbl-shockwave').innerText = isEn ? 'Shockwave' : '衝擊波';
+    document.getElementById('lbl-quiz-title').innerText = isEn ? 'MIND TRIAL: LEVEL UP!' : '心智試煉 LEVEL UP!';
+    document.getElementById('lbl-quiz-desc').innerText = isEn ? `Select correct steps within ${QUIZ_TIME_LIMIT}s! Get 3/3 right to choose your reward!` : `${QUIZ_TIME_LIMIT}秒內選出正確概念步驟！三題全對即可選擇專屬獎勵！`;
+    document.getElementById('lbl-end-time').innerText = isEn ? 'Survival Time' : '存活時間';
+    document.getElementById('lbl-end-kills').innerText = isEn ? 'Entities Defeated' : '消滅實體';
+    document.getElementById('lbl-end-level').innerText = isEn ? 'System Rating' : '系統評級';
+
+    player = new Player(); enemies = []; particles = []; projectiles = []; floatingTexts = [];
+    kills = 0; gameTime = 0; timeSinceLastQuiz = 0;
+    uiKills.innerText = kills; uiLevel.innerText = player.level; expBar.style.width = '0%';
+    ['progress-meteor', 'progress-lightning', 'progress-firestorm', 'progress-shockwave'].forEach(id => { document.getElementById(id).style.width = '0%'; });
+    
+    lastTime = performance.now(); cancelAnimationFrame(animationFrameId); animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function endGame(win = false) {
+    gameState = 'GAMEOVER';
+    modalContainer.classList.remove('hidden'); gameoverScreen.classList.remove('hidden'); startScreen.classList.add('hidden'); levelupScreen.classList.add('hidden');
+    const titleEl = document.getElementById('end-title'); const isEn = currentLang === 'en';
+    if (win) {
+        titleEl.innerText = 'SYSTEM CONQUERED'; titleEl.className = 'text-5xl md:text-6xl font-black text-cyan-400 mb-4 drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]';
+        document.getElementById('end-desc').innerText = isEn ? 'You survived and mastered the trials!' : '你解開了所有的封印，成功生還！';
+    } else {
+        titleEl.innerText = 'SYSTEM FAILURE'; titleEl.className = 'text-5xl md:text-6xl font-black text-red-500 mb-4 drop-shadow-[0_0_15px_rgba(255,0,0,0.8)]';
+        document.getElementById('end-desc').innerText = isEn ? 'Overwhelmed by entities...' : '洪流吞噬了你，邏輯運算終止...';
+    }
+    const m = Math.floor(gameTime / 60000), s = Math.floor((gameTime % 60000) / 1000);
+    document.getElementById('end-time').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    document.getElementById('end-kills').innerText = kills; document.getElementById('end-level').innerText = player.level;
+}
+
+function spawnEnemies(dt) {
+    const minutes = gameTime / 60000;
+    const lvlMult = 1 + (player.level - 1) * 0.35; 
+    if (Math.random() < (3 + minutes * 3) * lvlMult * dt) {
+        const ang = Math.random() * Math.PI * 2, dist = Math.max(canvas.width, canvas.height) / 2 + 100;
+        const ex = player.x + Math.cos(ang)*dist, ey = player.y + Math.sin(ang)*dist;
+        const hp = (20 + (minutes * 30)) * lvlMult, spd = (80 + (minutes * 10)) * (1 + (player.level - 1) * 0.08), dmg = (10 + (minutes * 4)) * lvlMult;
+        let type = 'square', color = '#ff0055';
+        if (minutes > 1.5 && Math.random() > 0.6) { type = 'triangle'; color = '#aa00ff'; }
+        if (minutes > 3 && Math.random() > 0.7) color = '#ffaa00';
+        if (Math.random() < (0.03 * minutes + (player.level * 0.01))) {
+            enemies.push(new Enemy(ex, ey, hp * 6, spd * 0.85, dmg * 2, '#ff0000', 'boss'));
+        } else {
+            enemies.push(new Enemy(ex, ey, hp, spd, dmg, color, type));
+        }
+    }
+}
+
+function gameLoop(timestamp) {
+    if (gameState !== 'PLAYING') return;
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.1); lastTime = timestamp;
+    gameTime += dt * 1000; timeSinceLastQuiz += dt * 1000;
+    expBar.style.width = `${Math.min(100, (timeSinceLastQuiz / QUIZ_INTERVAL) * 100)}%`;
+
+    if (timeSinceLastQuiz >= QUIZ_INTERVAL) { timeSinceLastQuiz = 0; triggerLevelUpQuiz(); return; }
+
+    const m = Math.floor(gameTime / 60000), s = Math.floor((gameTime % 60000) / 1000);
+    uiTimer.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    if (gameTime >= GAME_DURATION) { endGame(true); return; }
+
+    player.update(dt);
+    camera.x += ((player.x - canvas.width / 2) - camera.x) * 10 * dt; camera.y += ((player.y - canvas.height / 2) - camera.y) * 10 * dt;
+    spawnEnemies(dt); enemies.forEach(e => e.update(dt));
+    
+    for(let i=particles.length-1; i>=0; i--) if(!particles[i].update(dt)) particles.splice(i,1);
+    for(let i=projectiles.length-1; i>=0; i--) { const p = projectiles[i]; if(p.update) { p.update(dt); if(p.active===false) projectiles.splice(i,1); } }
+    for(let i=floatingTexts.length-1; i>=0; i--) { floatingTexts[i].life-=dt; floatingTexts[i].y-=30*dt; if(floatingTexts[i].life<=0) floatingTexts.splice(i,1); }
+
+    ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.save(); ctx.translate(-camera.x, -camera.y);
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.07)'; ctx.lineWidth = 1; const grid = 150;
+    ctx.beginPath();
+    for (let x = Math.floor(camera.x/grid)*grid; x < camera.x+canvas.width; x+=grid) { ctx.moveTo(x, camera.y); ctx.lineTo(x, camera.y+canvas.height); }
+    for (let y = Math.floor(camera.y/grid)*grid; y < camera.y+canvas.height; y+=grid) { ctx.moveTo(camera.x, y); ctx.lineTo(camera.x+canvas.width, y); }
+    ctx.stroke();
+
+    projectiles.forEach(p => { if(p.type === 'firepool') p.draw(ctx); });
+    projectiles.forEach(p => { if(p.type !== 'firepool') p.draw(ctx); });
+    enemies.forEach(e => e.draw(ctx)); player.draw(ctx); particles.forEach(p => p.draw(ctx));
+
+    ctx.font = 'bold 20px "Inter", sans-serif'; ctx.textAlign = 'center';
+    floatingTexts.forEach(ft => { ctx.shadowBlur=5; ctx.shadowColor='#000'; ctx.fillStyle=`rgba(255,255,255,${ft.life})`; ctx.fillText(ft.text, ft.x, ft.y); ctx.shadowBlur=0; });
+    ctx.restore();
+    animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function triggerLevelUpQuiz() {
+    gameState = 'LEVELUP'; modalContainer.classList.remove('hidden'); startScreen.classList.add('hidden'); gameoverScreen.classList.add('hidden'); levelupScreen.classList.remove('hidden'); btnContinue.classList.add('hidden', 'fade-in');
+    const container = document.getElementById('quiz-cards-container'); container.innerHTML = '';
+    currentUpgrades = []; quizResults = [null, null, null]; currentQuizzesData = []; activeQuizzes = 3;
+    
+    for(let i=0; i<3; i++) {
+        let upg = getRandomElement(['meteor', 'lightning', 'firestorm']); currentUpgrades.push(upg);
+        let qData = TopicConfig.generateQuestion(currentLang); currentQuizzesData.push(qData);
+        
+        const card = document.createElement('div'); card.id = `quiz-card-${i}`;
+        card.className = 'relative p-3 md:p-4 bg-black/60 border-2 rounded-2xl flex flex-col items-center transition-all duration-300 backdrop-blur-md w-full md:w-1/3';
+        card.style.borderColor = weaponDetails[upg].color; card.style.boxShadow = `0 0 20px ${weaponDetails[upg].color}40, inset 0 0 10px ${weaponDetails[upg].color}20`;
+
+        const title = document.createElement('div'); title.className = 'text-sm md:text-base font-black mb-2 drop-shadow-md tracking-wider flex items-center gap-2'; title.style.color = weaponDetails[upg].color;
+        title.innerHTML = `<span>${weaponDetails[upg].icon}</span> ${weaponDetails[upg].name} (Lv.${player.weapons[upg].active ? player.weapons[upg].level : 0} &rarr; ${(player.weapons[upg].active ? player.weapons[upg].level : 0)+1})`;
+
+        const qBox = document.createElement('div'); qBox.className = 'w-full min-h-[110px] flex flex-col items-center justify-center bg-gray-900/90 rounded-lg p-2 mb-3 border border-gray-700 shadow-inner overflow-x-auto text-white font-serif relative';
+        
+        if (qData.prevSteps && qData.prevSteps.length > 0) {
+            const prevContainer = document.createElement('div');
+            prevContainer.className = "text-xs md:text-sm text-cyan-300/80 mb-2 pb-2 border-b border-cyan-800/50 w-full text-center pointer-events-none";
+            qData.prevSteps.forEach((step) => {
+                const stepEl = document.createElement('div');
+                katex.render(`\\displaystyle{\\begin{gathered}${step}\\end{gathered}}`, stepEl, { throwOnError: false, displayMode: true });
+                prevContainer.appendChild(stepEl);
+            });
+            qBox.appendChild(prevContainer);
+        }
+
+        if (qData.svg) { const imgEl = document.createElement('div'); imgEl.innerHTML = qData.svg; imgEl.className = "mb-1 flex justify-center w-full pointer-events-none"; qBox.appendChild(imgEl); }
+        const txtEl = document.createElement('div'); txtEl.className = "pointer-events-none"; katex.render(`\\displaystyle{\\begin{gathered}${qData.question}\\end{gathered}}`, txtEl, { throwOnError: false, displayMode: true }); qBox.appendChild(txtEl);
+
+        const grid = document.createElement('div'); grid.className = 'grid grid-cols-1 gap-2 w-full mt-auto';
+        qData.options.forEach((opt, optIdx) => {
+            const btn = document.createElement('button'); 
+            btn.className = 'p-2.5 bg-gray-800 border border-gray-600 rounded-lg transition-all text-white hover:bg-gray-700 hover:border-white shadow-md flex items-center justify-center min-h-[48px] font-serif relative overflow-hidden w-full text-sm cursor-pointer pointer-events-auto';
+            
+            const katexSpan = document.createElement('span');
+            katexSpan.className = 'pointer-events-none';
+            katex.render(`\\displaystyle{${opt}}`, katexSpan, { throwOnError: false });
+            btn.appendChild(katexSpan);
+
+            setupButton(btn, () => handleCardAnswer(i, optIdx === qData.correctIdx, card, btn, grid, qData.correctIdx));
+            grid.appendChild(btn);
+        });
+
+        card.append(title, qBox, grid); container.appendChild(card);
+    }
+
+    quizTimeLeft = QUIZ_TIME_LIMIT; 
+    quizTimerBar.style.width = '100%'; 
+    quizTimerText.innerText = `${QUIZ_TIME_LIMIT}s`;
+    quizTimerBar.classList.add('from-fuchsia-600', 'to-pink-500'); 
+    quizTimerBar.classList.remove('from-red-600', 'to-orange-500'); 
+    quizTimerText.classList.remove('text-red-300', 'animate-ping');
+
+    clearInterval(quizTimerInterval);
+    quizTimerInterval = setInterval(() => {
+        quizTimeLeft--; 
+        quizTimerBar.style.width = `${(quizTimeLeft/QUIZ_TIME_LIMIT)*100}%`; 
+        quizTimerText.innerText = `${quizTimeLeft}s`;
+        if (quizTimeLeft <= 10) { quizTimerBar.classList.add('from-red-600', 'to-orange-500'); quizTimerBar.classList.remove('from-fuchsia-600', 'to-pink-500'); quizTimerText.classList.add('text-red-300', 'animate-ping'); }
+        else { quizTimerBar.classList.add('from-fuchsia-600', 'to-pink-500'); quizTimerBar.classList.remove('from-red-600', 'to-orange-500'); quizTimerText.classList.remove('text-red-300', 'animate-ping'); }
+        if (quizTimeLeft <= 0) {
+            clearInterval(quizTimerInterval);
+            for(let i=0; i<3; i++) if(quizResults[i] === null) handleCardAnswer(i, false, document.getElementById(`quiz-card-${i}`), null, document.getElementById(`quiz-card-${i}`).querySelector('.grid'), currentQuizzesData[i].correctIdx, true);
+        }
+    }, 1000);
+}
+
+function handleCardAnswer(index, isCorrect, card, clickedBtn, grid, correctIdx, isTimeout=false) {
+    if (quizResults[index] !== null) return;
+    quizResults[index] = isCorrect; activeQuizzes--;
+    grid.querySelectorAll('button').forEach((b, i) => {
+        b.disabled = true; b.classList.remove('hover:bg-gray-700', 'hover:border-white');
+        if (i === correctIdx) b.classList.add('bg-green-600/50', 'border-green-400', 'shadow-[0_0_15px_rgba(74,222,128,0.5)]');
+        else if (b === clickedBtn && !isCorrect) b.classList.add('bg-red-600/50', 'border-red-500', 'shadow-[0_0_15px_rgba(239,68,68,0.5)]');
+        else b.classList.add('opacity-40');
+    });
+
+    const stamp = document.createElement('div'); stamp.className = 'absolute -top-3 -right-3 text-4xl drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] z-20 animate-bounce';
+    if (isCorrect) { stamp.innerHTML = '✅'; applyUpgrades([currentUpgrades[index]]); card.style.borderColor = '#4ade80'; card.style.boxShadow = '0 0 20px rgba(74, 222, 128, 0.4)'; }
+    else { stamp.innerHTML = isTimeout ? '⌛' : '❌'; card.style.borderColor = '#ef4444'; card.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)'; }
+    card.appendChild(stamp);
+    if (activeQuizzes <= 0) endQuizPhase();
+}
+
+function applyUpgrades(upgrades) {
+    upgrades.forEach(u => {
+        if (!player.weapons[u].active) { player.weapons[u].active = true; player.weapons[u].level = 1; if(u === 'meteor') player.weapons[u].count = 1; } 
+        else player.weapons[u].level++;
+        const uiBar = document.getElementById(weaponDetails[u].uiId);
+        if(uiBar) uiBar.style.width = `${Math.min(100, (player.weapons[u].level / 10) * 100)}%`;
+    });
+}
+
+function endQuizPhase() {
+    clearInterval(quizTimerInterval); player.level++; uiLevel.innerText = player.level;
+    const isEn = currentLang === 'en';
+    if (quizResults.filter(r => r === true).length === 3) {
+        const overlay = document.getElementById('perfect-reward-overlay');
+        document.getElementById('lbl-perfect-desc').innerText = isEn ? 'Select your trial reward:' : '請選擇你的試煉回報：';
+        document.getElementById('lbl-heal-title').innerText = isEn ? 'Restore 20 HP' : '回復 20 生命值';
+        document.getElementById('lbl-heal-sub').innerText = isEn ? 'Heal player by +20' : '補滿部分體力';
+        document.getElementById('lbl-shockwave-title').innerText = isEn ? '2s Shockwave Burst' : '2秒暴風衝擊波';
+        document.getElementById('lbl-shockwave-sub').innerText = isEn ? 'Continuous blast wave' : '持續推開擊退強敵';
+        overlay.classList.remove('hidden');
+
+        const resumeBattle = () => { 
+            if (gameState === 'PLAYING') return; 
+            overlay.classList.add('hidden'); 
+            levelupScreen.classList.add('hidden'); 
+            modalContainer.classList.add('hidden'); 
+            gameState = 'PLAYING'; 
+            lastTime = performance.now(); 
+            animationFrameId = requestAnimationFrame(gameLoop); 
+        };
+        setupButton(document.getElementById('btn-reward-heal'), () => { player.hp = Math.min(player.maxHp, player.hp + 20); floatingTexts.push({ x: player.x, y: player.y - 40, text: isEn ? '+20 HP RESTORED!' : '+20 生命值回復！', life: 2.5, color: '#4ade80' }); resumeBattle(); });
+        setupButton(document.getElementById('btn-reward-shockwave'), () => { activeShockwaveBurstTimer = 2.0; floatingTexts.push({ x: player.x, y: player.y - 40, text: isEn ? '2S SHOCKWAVE BURST!' : '2秒暴風衝擊波發動！', life: 2.5, color: '#ffee00' }); resumeBattle(); });
+    } else {
+        btnContinue.classList.remove('hidden'); btnContinue.classList.add('fade-in');
+    }
+}
+
+function setupButton(btn, callback) {
+    if (!btn) return;
+    
+    if (btn._myHandler) {
+        btn.removeEventListener('touchstart', btn._myHandler);
+        btn.removeEventListener('click', btn._myHandler);
+    }
+    
+    btn._myHandler = (e) => { 
+        if (e && e.cancelable) e.preventDefault(); 
+        if (btn.isProcessing) return;
+        btn.isProcessing = true;
+        callback();
+        setTimeout(() => btn.isProcessing = false, 500); 
+    };
+    
+    btn.addEventListener('touchstart', btn._myHandler, { passive: false });
+    btn.addEventListener('click', btn._myHandler);
+}
+
+setupButton(btnStartZh, () => startGame('zh'));
+setupButton(btnStartEn, () => startGame('en'));
+setupButton(btnRestart, () => startGame(currentLang));
+setupButton(btnContinue, () => { 
+    if (gameState === 'PLAYING') return; 
+    levelupScreen.classList.add('hidden'); 
+    modalContainer.classList.add('hidden'); 
+    gameState = 'PLAYING'; 
+    lastTime = performance.now(); 
+    animationFrameId = requestAnimationFrame(gameLoop); 
+});
+
+</script>
+</body>
+</html>
